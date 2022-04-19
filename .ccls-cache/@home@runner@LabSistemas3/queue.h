@@ -4,19 +4,14 @@
 
 // Structure to represent an element.
 struct element {
-    // Machine type.
-	int type;
-    // Using time.
-	int time;
+	int type;		// Machine type.
+	int time;		// Using time.
 };
 
 // Structure to represent a queue.
 typedef struct queue {
 	// Variables for the head, tail and size of the queue.
-    int head, tail, size;
-	
-	// int leng;
-
+    int head, tail, size, capacity;
 	// Pointer to the elements of the queue.
 	struct element *elements
 } queue;

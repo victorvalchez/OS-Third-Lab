@@ -14,25 +14,18 @@ https://www.geeksforgeeks.org/queue-set-1introduction-and-array-implementation/
 // To create a queue and reserve the size specified as a parameter.
 queue* queue_init(int size){
 
+	// Create the queue.
 	queue * q = (queue *)malloc(sizeof(queue));
 
+	// Assign by default values to the variables of the queue.
+	q -> head = 0;
+    q -> tail = size - 1;
     q -> size = size;
-    q -> head = queue -> size = 0;
-    q -> tail = capacity - 1;
-    q -> array = (int*)malloc(q -> capacity * sizeof(int));
+	q -> capacity = 0;
+    q -> elements = malloc(q -> size * sizeof(struct element));
 
 	return q;
 }
-
-/*
-//set values to default state
-q->size = size;
-q->leng = 0;
-q->head = 0;
-q->tail = 0;
-//we define the necessesary memory by using de size and the sizeof the element (time,type)
-q->data = malloc(q->size * sizeof(struct element));
-*/
 
 
 // To ENQUEUE an element if possible or wait if not.
@@ -52,18 +45,28 @@ struct element* queue_get(queue *q) {
 // To check if the queue is empty (return 1) or not (return 0).
 int queue_empty(queue *q){
 	
-	return 0;
+	// Check if the queue is empty (capacity = 0).
+	return (q -> capacity == 0);
 }
 
 
 // To check if the queue is full (return 1) or not (return 0).
 int queue_full(queue *q){
 	
-	return 0;
+	// Check if the queue is full (size = capacity).
+	return (q -> size == q -> capacity);
 }
 
 
 // To destroy the queue and free the assigned resources.
 int queue_destroy(queue *q){
+
+	// !!! REVISAR ESTO !!!
+
+	// Free the assigned resources.
+	free(q -> elements);
+	// Destroy the queue.
+	free(q);
+
 	return 0;
 }
