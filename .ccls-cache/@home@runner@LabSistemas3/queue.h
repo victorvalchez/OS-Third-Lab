@@ -23,4 +23,5 @@ struct element * queue_get(queue *q);
 int queue_empty (queue *q);
 int queue_full(queue *q);
 
+// !!!! tenemos que quitar este endif?
 #endif

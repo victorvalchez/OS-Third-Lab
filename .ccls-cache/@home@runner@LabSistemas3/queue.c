@@ -3,7 +3,6 @@ Queue functions implementations:
 https://www.geeksforgeeks.org/queue-set-1introduction-and-array-implementation/
 */
 
-
 #include "queue.h"
 #include <stddef.h>
 #include <stdio.h>
@@ -19,7 +18,7 @@ queue* queue_init(int size){
 
 	// Assign by default values to the variables of the queue.
 	q -> head = 0;
-    q -> tail = size - 1;
+    q -> tail = 0;
     q -> size = size;
 	q -> capacity = 0;
     q -> elements = malloc(q -> size * sizeof(struct element));
