@@ -11,11 +11,25 @@
 #include <unistd.h>
 
 
+// Mutex to access shared buffer.
+pthread_mutex_t mutex;
+
+// Synchronization variable -> Can we add more elements?
+pthread_cond_t non_full;
+// Synchronization variable -> Can we remove elements?
+pthread_cond_t non_empty;
+
+
 /*
 PRODUCER THREAD:
 - Obtain data extracted from the file.
 - Insert data one by one in the circular buffer.
 */
+
+void producer() {
+
+    pthread_exit(0);
+}
 
 
 /*
@@ -25,6 +39,9 @@ CONSUMER THREAD:
 - The consumer must calculate the cost and accumulate it until all elements have been processed.
 - Return to the main thread the partial cost calculated by each one.
 */
+int consumer(int *consumers) {
+    
+}
 
 
 /**
@@ -43,6 +60,32 @@ int main (int argc, const char * argv[] ) {
     // Wait until execution of PRODUCERS finish.
     // End of execution to CONSUMERS.
     // Show the total calculated cost.
+
+
+    // We check if the number of arguments is correct.
+	if (argc != 4) {
+    	perror("[ERROR] Invalid number of arguments");
+    	return -1;
+  	}
+
+    // We open the file given as argument.
+    
+
+
+    // SLIDE 37 - CONCURRENCY [LECTURE 2]
+    pthread_t th1, th2;
+    pthread_mutex_init(&mutex, NULL);
+    pthread_cond_init(&non_full, NULL);
+    pthread_cond_init(&non_empty, NULL);
+    pthread_create(&th1, NULL, producer, NULL);
+    pthread_create(&th2, NULL, consumer, NULL);
+    pthread_join(th1, NULL);
+    pthread_join(th2, NULL);
+    pthread_mutex_destroy(&mutex);
+    pthread_cond_destroy(&non_full);
+    pthread_cond_destroy(&non_empty);
+
+    
 
     return 0;
 }
