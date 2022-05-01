@@ -73,15 +73,21 @@ int main (int argc, const char * argv[] ) {
 
 
     // SLIDE 37 - CONCURRENCY [LECTURE 2]
-    pthread_t th1, th2;
+    pthread_t producers_thread, consumers_thread;
+    
     pthread_mutex_init(&mutex, NULL);
+    
     pthread_cond_init(&non_full, NULL);
     pthread_cond_init(&non_empty, NULL);
-    pthread_create(&th1, NULL, producer, NULL);
-    pthread_create(&th2, NULL, consumer, NULL);
-    pthread_join(th1, NULL);
-    pthread_join(th2, NULL);
+    
+    pthread_create(&producers_thread, NULL, producer, NULL);
+    pthread_create(&consumers_thread, NULL, consumer, NULL);
+    
+    pthread_join(producers_thread, NULL);
+    pthread_join(consumers_thread, NULL);
+    
     pthread_mutex_destroy(&mutex);
+    
     pthread_cond_destroy(&non_full);
     pthread_cond_destroy(&non_empty);
 
