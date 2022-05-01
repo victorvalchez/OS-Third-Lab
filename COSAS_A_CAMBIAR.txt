@@ -1,0 +1,2 @@
+en el del año pasado el numero de consumidores era 1 entonces los args que recivia eran 3
+	hay que hacer lo mismo que para los productores pero en los consumidores (el loop)

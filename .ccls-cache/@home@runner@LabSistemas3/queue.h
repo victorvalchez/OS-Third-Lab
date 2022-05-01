@@ -1,27 +1,26 @@
-#define HEADER_FILE
 #ifndef HEADER_FILE
+#define HEADER_FILE
 
-
-// Structure to represent an element.
 struct element {
-	int type;		// Machine type.
-	int time;		// Using time.
+  int type; // Machine type
+  int time; // Using time
 };
 
-// Structure to represent a queue.
 typedef struct queue {
-	// Variables for the head, tail and size of the queue.
-    int head, tail, size, capacity;
-	// Pointer to the elements of the queue.
-	struct element *elements
+  // Define the struct yourself
+  int length;
+ // BORRAR ESTE COMENT Y EL DE ABAJO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  struct element *elements;  //Cambiar ring en el otro archivo por elements
+  int head;
+  int tail;
+  int size;
 } queue;
 
-queue* queue_init (int size);
-int queue_destroy (queue *q);
-int queue_put (queue *q, struct element* elem);
-struct element * queue_get(queue *q);
-int queue_empty (queue *q);
+queue *queue_init(int size);
+int queue_destroy(queue *q);
+int queue_put(queue *q, struct element *elem);
+struct element *queue_get(queue *q);
+int queue_empty(queue *q);
 int queue_full(queue *q);
 
-// !!!! tenemos que quitar este endif?
 #endif
