@@ -30,7 +30,7 @@ testeo(){
     echo " === salida ./calculator  === "
     cat  out_calc
     echo " === salida esperada  === "     
-    cat  $4
+    cat  $5
    fi
    rm -f out* 
    echo
