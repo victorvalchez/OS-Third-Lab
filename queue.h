@@ -14,7 +14,7 @@ typedef struct queue {
   int head;
   int tail;
   int size;
-} queue;
+}queue;
 
 queue *queue_init(int size);
 int queue_destroy(queue *q);

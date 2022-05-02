@@ -27,9 +27,9 @@ queue *queue_init(int size) {
 
 // To ENQUEUE an element if possible or wait if not.
 int queue_put(queue *q, struct element *elem){
-	if (queue_full(q) == 0) {
+  	if (queue_full(q) == 0) {
     	q->elements[q->head] = *elem;
-    	q->head = (q->head + 1) % q->size;
+    	q->head = (q->head + 1) % q->size;  //To be inside the correct size
     	q->length = q->length + 1;
     	return 0;
   	}
