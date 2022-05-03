@@ -1,17 +1,15 @@
-// QUEUE DE RAUL
-
-
-/*
-Queue functions implementations:
-https://www.geeksforgeeks.org/queue-set-1introduction-and-array-implementation/
-*/
-
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
 #include "queue.h"
+// QUEUE DE RAUL
+
+/*
+Queue functions implementations:
+https://www.geeksforgeeks.org/queue-set-1introduction-and-array-implementation/
+*/
 
 
 // To create a queue and reserve the size specified as a parameter.
