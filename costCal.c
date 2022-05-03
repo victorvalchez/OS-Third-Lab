@@ -1,5 +1,7 @@
+
 #include "queue.h"
 #include <fcntl.h>
+#include <math.h>
 #include <pthread.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -10,39 +12,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-
-// Mutex to access shared buffer.
-pthread_mutex_t mutex;
-
-// Synchronization variable -> Can we add more elements?
-pthread_cond_t non_full;
-// Synchronization variable -> Can we remove elements?
-pthread_cond_t non_empty;
-
-
-/*
-PRODUCER THREAD:
-- Obtain data extracted from the file.
-- Insert data one by one in the circular buffer.
-*/
-
-void producer() {
-
-    pthread_exit(0);
-}
-
-
-/*
-CONSUMER THREAD:
-- Obtain (concurrently) the elements inserted in the queue.
-- Each extracted element represents a type of machine and the time of use.
-- The consumer must calculate the cost and accumulate it until all elements have been processed.
-- Return to the main thread the partial cost calculated by each one.
-*/
-int consumer(int *consumers) {
-    
-}
-
+#define NUM_CONSUMERS 1
 
 /**
  * Entry point
@@ -50,48 +20,316 @@ int consumer(int *consumers) {
  * @param argv
  * @return
  */
-int main (int argc, const char * argv[] ) {
+//Creacion de mutex, variables condición y descriptor de fichero:
+//ring controla el buffer
+//des controla el descriptor de fichero
+pthread_mutex_t elements;
+pthread_mutex_t des;
+pthread_cond_t lleno;
+pthread_cond_t vacio;
+struct queue *q;
+const char *fichero;
+FILE *descriptorP;
+int total = 0; //Total cost
 
-    // Read the input arguments.
-    // Load the data from the file provided into memory.
-    // Distribute the file load equally among the number of producers threads indicated.
-    // Create PRODUCERS.
-    // Create CONSUMERS.
-    // Wait until execution of PRODUCERS finish.
-    // End of execution to CONSUMERS.
-    // Show the total calculated cost.
+struct param {
+  int id_ini;
+  int op;
+};
+
+// Cada hilo tiene acceso a su propio dominio de id`s, donde el nº de operaciones que tendrá asociado será
+// floor(num.lineas/num.productores), leerá e insertará de uno en uno
+void *producir(void *arg) {
+  // Sacar parametros
+  struct param *p = arg;
+
+  // Hallamos el descriptor que corresponde al primer indice, para que no se mezclen bloqueamos y desbloqueamos
+  if(pthread_mutex_lock(&des) < 0){
+    perror("Error de mutex");
+    exit(-1);
+  }
+
+  descriptorP = fopen(fichero, "r");
+  if( descriptorP == NULL){
+    perror("Error al abrir fichero");
+    exit(-1);
+  }
+  int counter = 0;
+  char chr;
+  while (counter < p->id_ini) {
+    chr = fgetc(descriptorP);
+    if (chr == '\n') {
+      counter++;
+    }
+  }
+  // Almacenamos la posicion por la que va, de esta manera la podemos recuperar.
+  FILE *current = descriptorP;
 
 
-    // We check if the number of arguments is correct.
-	if (argc != 5) { // 5 because the name of the program counts as one
-    	perror("[ERROR] Invalid number of arguments");
-    	return -1;
-  	}
+  if(pthread_mutex_unlock(&des) < 0){
+    perror("Error de mutex");
+    exit(-1);
+  }
 
-    // We open the file given as argument.
-    
+  int i, i1, i2 = 0;
+  for (int j = p->op; j > 0; j--) {
+
+    // Sacamos los valores a introducir en el buffer del puntero, y salvamos la nueva posicion del mismo.
+    if(pthread_mutex_lock(&des) < 0){
+      perror("Error de mutex");
+      exit(-1);
+    }
+
+    descriptorP = current;
+    if(fscanf(descriptorP, "%d %d %d", &i, &i1, &i2) < 0){
+      perror("Error al extraer datos archivo");
+      exit(-1);
+    }
+    current = descriptorP;
 
 
-    // SLIDE 37 - CONCURRENCY [LECTURE 2]
-    pthread_t producers_thread, consumers_thread;
-    
-    pthread_mutex_init(&mutex, NULL);
-    
-    pthread_cond_init(&non_full, NULL);
-    pthread_cond_init(&non_empty, NULL);
-    
-    pthread_create(&producers_thread, NULL, producer, NULL);
-    pthread_create(&consumers_thread, NULL, consumer, NULL);
-    
-    pthread_join(producers_thread, NULL);
-    pthread_join(consumers_thread, NULL);
-    
-    pthread_mutex_destroy(&mutex);
-    
-    pthread_cond_destroy(&non_full);
-    pthread_cond_destroy(&non_empty);
+    if(pthread_mutex_unlock(&des) < 0){
+      perror("Error de mutex");
+      exit(-1);
+    }
 
-    
+    struct element temporal = {i1, i2};
 
-    return 0;
+    if(pthread_mutex_lock(&elements) < 0){
+      perror("Error de mutex");
+      exit(-1);
+    }
+    while (queue_full(q))
+      if(pthread_cond_wait(&lleno, &elements) < 0){
+        perror("Error de variable de condicion");
+        exit(-1);
+      }
+
+
+    if(queue_put(q, &temporal) < 0){
+      perror("Error al insertar");
+      exit(-1);
+    }
+    if(pthread_cond_signal(&vacio) < 0){
+      perror("Error de variable de condicion");
+      exit(-1);
+    }
+    if(pthread_mutex_unlock(&elements) < 0){
+      perror("Error de mutex");
+      exit(-1);
+    }
+  }
+  pthread_exit(0);
+}
+
+void *consumir(int *numValores) {
+  //The consumer gets the data from the queue and then calculates the total cost
+  struct element data;
+  // Bucle de todo mientras no se hallan leido todas las ops esperadas.
+  for (int k = 0; k < *numValores; k++) {
+
+    if(pthread_mutex_lock(&elements) < 0){
+      perror("Error de mutex");
+      exit(-1);
+    }
+    //To wait while the queue does not have any element
+    while (queue_empty(q))
+      if(pthread_cond_wait(&vacio, &elements) < 0){
+        perror("Error de variable de condicion");
+        exit(-1);
+      }
+
+    struct element *data = queue_get(q);
+    if(data==NULL){
+      perror("Error al extraer");
+      exit(-1);
+    }
+
+    switch (data->type) {
+    case 1:
+      total += 1 * data->time;
+
+      break;
+    case 2:
+      total += 3 * data->time;
+
+      break;
+    case 3:
+      total += 10 * data->time;
+
+      break;
+    default:
+      perror("Valor no valido");
+    }
+    if(pthread_cond_signal(&lleno) < 0){
+      perror("Error de variable de condicion");
+      exit(-1);
+    }
+    if(pthread_mutex_unlock(&elements) < 0){
+      perror("Error de mutex");
+      exit(-1);
+    }
+  }
+  pthread_exit(0);
+}
+// CALCULA LAS LINEAS QUE HAY EN EL ARCHIVO INTRODUCIDO
+int calculo_lineas(const char filename[]) {
+  FILE *file = fopen(filename, "r");
+  if(file == NULL){
+    perror("Error al abrir fichero");
+    exit(-1);
+  }
+  char chr;
+  int lines = 0;
+  while (!feof(file)) {
+    chr = fgetc(file);
+    if (chr == '\n') {
+      lines++;
+    }
+  }
+  fclose(file);
+  return lines;
+}
+
+int main(int argc, const char *argv[]) {
+  //Control de errores de los datos iniciales
+  if (argc > 4) {
+    perror("Numero de argumentos invalido");
+    return -1;
+  }
+
+  FILE *descriptor = fopen(argv[1], "r");
+  if(descriptor == NULL){
+    perror("Error al abrir fichero");
+    exit(-1);
+  }
+  // NUMVAL TIENE EL NUMERO DE OPERACIONES QUE HAY QUE HACER
+  int numVal;
+  if(fscanf(descriptor, "%d", &numVal) < 0){
+    perror("Error al extraer datos archivo");
+    exit(-1);
+  }
+  // ESTO COMPRUEBA SI LAS OPERACIONES QUE PONEN EN LA PRIMERA LINEA (500) SON IGUALES AL NUMERO DE LINEAS QUE HAY (OPERACIONES)
+  int numLin = calculo_lineas(argv[1]);
+  if (numVal > (numLin - 1)) {
+    perror("Error: Se indica un numero de operaciones incorrecto");
+    return -1;
+  }
+// COMPROBACION DE PRODUCTORES
+  int productores = atoi(argv[2]);
+  if (productores <= 0) {
+    perror("Error: Numero invalido de productores.");
+    return -1;
+  }
+  // COMPROBACION DE CONSUMIDORES
+  int consumers = atoi(argv[3]);
+  if (consumers <= 0) {
+    perror("Error: Numero invalido de consumers.");
+    return -1;
+  }
+  //SIZE DEL BUFFER ES NUESTRO ARGV 4
+  int size = atoi(argv[4]);
+  if (size <= 0) {
+    perror("Error: Tamaño invalido.");
+    return -1;
+  }
+
+//INICIALIZAMOS LA QUEUE CON EL SIZE DADO
+  q = queue_init(size);
+  //PARA INICIAR LOS MUTEXES DE ESCRITURA DE LA QUEUE
+  if(pthread_mutex_init(&elements, NULL) < 0){ // RING ES ELEMENTS
+    perror("Error inicializar variable de condicion");
+    exit(-1);
+  }
+  if(pthread_mutex_init(&des, NULL) < 0){
+    perror("Error inicializar variable de condicion");
+    exit(-1);
+  }
+  if(pthread_cond_init(&lleno, NULL) < 0){
+    perror("Error inicializar mutex");
+    exit(-1);
+  }
+  if(pthread_cond_init(&vacio, NULL) < 0){
+    perror("Error inicializar mutex");
+    exit(-1);
+  }
+  //Creamos los hilos y establecemos el nº de operaciones que hará cada uno
+  int operaciones = floor((numVal / productores));  // DARLE EL NUMEOR DE OPERACIONES IGUAL A CADA PRODUCTOR
+  int id_inicio = 1;
+  pthread_t hilosP[productores];  // CREAR TANTOS HILOS COMO PRODUCTORES HAYA, HACER TAMBIEN CON LOS CONSUMIDORES
+  //En este solo hay un consumidor, CAMBIAR A VARIOS CONSUMIDORES
+  pthread_t hilosC[consumers];
+  for (int i = 0; i < (consumers - 1); i++){
+        if(pthread_create(&hilosC[i], NULL, (void *)consumir, &operaciones) < 0){  // NO SE POR QUE SE PONEN EL NUMVAL AL FINAL
+            perror("Error al crear hilo");
+        exit(-1);
+        }
+  }
+
+  //Ejecución de las operaciones
+  int i;
+  fichero = malloc(sizeof(char[strlen(argv[1])]));  //PRIMERO ALOCAMOS EL SIZE DEL FICHERO Y LUEGO LO PASAMOS
+  fichero = argv[1];
+  struct param args[productores];
+  for (i = 0; i < (productores - 1); i++) { //LOOP PARA CREAR TANTOS HILOS COMO PRODUCTORES
+    args[i].op = operaciones;
+    args[i].id_ini = id_inicio;
+
+    if(pthread_create(&hilosP[i], NULL, (void *)producir, &args[i]) < 0){
+      perror("Error al crear hilo");
+      exit(-1);
+    }
+
+    id_inicio += operaciones;
+  }
+  int op_ultimo = numVal - (i * operaciones);
+  args[productores - 1].op = op_ultimo;
+  args[productores - 1].id_ini = id_inicio;
+
+  //Control de errores de operaciones y valores finales
+  if(pthread_create(&hilosP[productores - 1], NULL, (void *)producir, &args[productores - 1]) < 0){
+    perror("Error al crear hilo");
+    exit(-1);
+  }
+
+  for (int i = 0; i < productores; i++) {
+    if(pthread_join(hilosP[i], NULL) < 0){
+      perror("Error al esperar al hilo");
+      exit(-1);
+    }
+  }
+  for (int i = 0; i < productores; i++) {
+    if(pthread_join(hilosC[i], NULL) < 0){
+        perror("Error al esperar al hilo");
+        exit(-1);
+    }
+  }
+
+  printf("Total: %i €.\n", total);
+  queue_destroy(q);
+  if(pthread_mutex_destroy(&des) < 0){
+    perror("Error al destruir mutex");
+    exit(-1);
+  }
+  if(pthread_mutex_destroy(&elements) < 0){
+    perror("Error al destruir mutex");
+    exit(-1);
+  }
+  if(  pthread_cond_destroy(&lleno) < 0){
+    perror("Error al destruir variable condicion");
+    exit(-1);
+  }
+  if(pthread_cond_destroy(&vacio) < 0){
+    perror("Error al destruir variable condicion");
+    exit(-1);
+  }
+  if(fclose(descriptorP) < 0){
+    perror("Error al cerrar descriptor");
+    exit(-1);
+  }
+  if(fclose(descriptor) < 0){
+    perror("Error al cerrar descriptor");
+    exit(-1);
+  }
+  return 0;
 }

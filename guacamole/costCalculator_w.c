@@ -23,14 +23,14 @@
 //Creacion de mutex, variables condición y descriptor de fichero:
 //ring controla el buffer
 //des controla el descriptor de fichero
-pthread_mutex_t ring;
+pthread_mutex_t elements;
 pthread_mutex_t des;
 pthread_cond_t lleno;
 pthread_cond_t vacio;
-struct queue *cola;
+struct queue *q;
 const char *fichero;
 FILE *descriptorP;
-int total = 0;
+int total = 0; //Total cost
 
 struct param {
   int id_ini;
@@ -95,18 +95,18 @@ void *producir(void *arg) {
 
     struct element temporal = {i1, i2};
 
-    if(pthread_mutex_lock(&ring) < 0){
+    if(pthread_mutex_lock(&elements) < 0){
       perror("Error de mutex");
       exit(-1);
     }
-    while (queue_full(cola))
-      if(pthread_cond_wait(&lleno, &ring) < 0){
+    while (queue_full(q))
+      if(pthread_cond_wait(&lleno, &elements) < 0){
         perror("Error de variable de condicion");
         exit(-1);
       }
 
 
-    if(queue_put(cola, &temporal) < 0){
+    if(queue_put(q, &temporal) < 0){
       perror("Error al insertar");
       exit(-1);
     }
@@ -114,7 +114,7 @@ void *producir(void *arg) {
       perror("Error de variable de condicion");
       exit(-1);
     }
-    if(pthread_mutex_unlock(&ring) < 0){
+    if(pthread_mutex_unlock(&elements) < 0){
       perror("Error de mutex");
       exit(-1);
     }
@@ -123,22 +123,23 @@ void *producir(void *arg) {
 }
 
 void *consumir(int *numValores) {
+  //The consumer gets the data from the queue and then calculates the total cost
   struct element data;
   // Bucle de todo mientras no se hallan leido todas las ops esperadas.
   for (int k = 0; k < *numValores; k++) {
 
-    if(pthread_mutex_lock(&ring) < 0){
+    if(pthread_mutex_lock(&elements) < 0){
       perror("Error de mutex");
       exit(-1);
     }
-
-    while (queue_empty(cola))
-      if(pthread_cond_wait(&vacio, &ring) < 0){
+    //To wait while the queue does not have any element
+    while (queue_empty(q))
+      if(pthread_cond_wait(&vacio, &elements) < 0){
         perror("Error de variable de condicion");
         exit(-1);
       }
 
-    struct element *data = queue_get(cola);
+    struct element *data = queue_get(q);
     if(data==NULL){
       perror("Error al extraer");
       exit(-1);
@@ -164,7 +165,7 @@ void *consumir(int *numValores) {
       perror("Error de variable de condicion");
       exit(-1);
     }
-    if(pthread_mutex_unlock(&ring) < 0){
+    if(pthread_mutex_unlock(&elements) < 0){
       perror("Error de mutex");
       exit(-1);
     }
@@ -228,9 +229,9 @@ int main(int argc, const char *argv[]) {
   }
 
 //INICIALIZAMOS LA QUEUE CON EL SIZE DADO
-  cola = queue_init(size);
+  q = queue_init(size);
   //PARA INICIAR LOS MUTEXES DE ESCRITURA DE LA QUEUE
-  if(pthread_mutex_init(&ring, NULL) < 0){ // RING ES ELEMENTS
+  if(pthread_mutex_init(&elements, NULL) < 0){ // RING ES ELEMENTS
     perror("Error inicializar variable de condicion");
     exit(-1);
   }
@@ -294,12 +295,12 @@ int main(int argc, const char *argv[]) {
   }
 
   printf("Total: %i €.\n", total);
-  queue_destroy(cola);
+  queue_destroy(q);
   if(pthread_mutex_destroy(&des) < 0){
     perror("Error al destruir mutex");
     exit(-1);
   }
-  if(pthread_mutex_destroy(&ring) < 0){
+  if(pthread_mutex_destroy(&elements) < 0){
     perror("Error al destruir mutex");
     exit(-1);
   }

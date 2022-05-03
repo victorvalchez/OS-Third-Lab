@@ -13,11 +13,11 @@
 //Creacion de mutex, variables condición y descriptor de fichero:
 //ring controla el buffer
 //des controla el descriptor de fichero
-pthread_mutex_t ring;
+pthread_mutex_t elements;
 pthread_mutex_t des;
 pthread_cond_t lleno;
 pthread_cond_t vacio;
-struct queue *cola;
+struct queue *q;
 const char *fichero;
 FILE *descriptorP;
 int total = 0;
