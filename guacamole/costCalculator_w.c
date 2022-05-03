@@ -171,7 +171,7 @@ void *consumir(int *numValores) {
   }
   pthread_exit(0);
 }
-
+// CALCULA LAS LINEAS QUE HAY EN EL ARCHIVO INTRODUCIDO
 int calculo_lineas(const char filename[]) {
   FILE *file = fopen(filename, "r");
   if(file == NULL){
@@ -202,31 +202,35 @@ int main(int argc, const char *argv[]) {
     perror("Error al abrir fichero");
     exit(-1);
   }
-
+  // NUMVAL TIENE EL NUMERO DE OPERACIONES QUE HAY QUE HACER
   int numVal;
   if(fscanf(descriptor, "%d", &numVal) < 0){
     perror("Error al extraer datos archivo");
     exit(-1);
   }
+  // ESTO COMPRUEBA SI LAS OPERACIONES QUE PONEN EN LA PRIMERA LINEA (500) SON IGUALES AL NUMERO DE LINEAS QUE HAY (OPERACIONES)
   int numLin = calculo_lineas(argv[1]);
   if (numVal > (numLin - 1)) {
     perror("Error: Se indica un numero de operaciones incorrecto");
     return -1;
   }
-
+// COMPROBACION DE PRODUCTORES
   int productores = atoi(argv[2]);
   if (productores <= 0) {
     perror("Error: Numero invalido de productores.");
     return -1;
   }
+  //SIZE DEL BUFFER ES NUESTRO ARGV 4
   int size = atoi(argv[3]);
   if (size <= 0) {
     perror("Error: Tamaño invalido.");
     return -1;
   }
 
+//INICIALIZAMOS LA QUEUE CON EL SIZE DADO
   cola = queue_init(size);
-  if(pthread_mutex_init(&ring, NULL) < 0){
+  //PARA INICIAR LOS MUTEXES DE ESCRITURA DE LA QUEUE
+  if(pthread_mutex_init(&ring, NULL) < 0){ // RING ES ELEMENTS
     perror("Error inicializar variable de condicion");
     exit(-1);
   }
@@ -243,21 +247,21 @@ int main(int argc, const char *argv[]) {
     exit(-1);
   }
   //Creamos los hilos y establecemos el nº de operaciones que hará cada uno
-  int operaciones = floor((numVal / productores));
+  int operaciones = floor((numVal / productores));  // DARLE EL NUMEOR DE OPERACIONES IGUAL A CADA PRODUCTOR
   int id_inicio = 1;
-  pthread_t hilosP[productores];
-  //En este solo hay un consumidor
+  pthread_t hilosP[productores];  // CREAR TANTOS HILOS COMO PRODUCTORES HAYA, HACER TAMBIEN CON LOS CONSUMIDORES
+  //En este solo hay un consumidor, CAMBIAR A VARIOS CONSUMIDORES
   pthread_t hiloC;
-  if(pthread_create(&hiloC, NULL, (void *)consumir, &numVal) < 0){
+  if(pthread_create(&hiloC, NULL, (void *)consumir, &numVal) < 0){  // NO SE POR QUE SE PONEN EL NUMVAL AL FINAL
     perror("Error al crear hilo");
     exit(-1);
   }
   //Ejecución de las operaciones
   int i;
-  fichero = malloc(sizeof(char[strlen(argv[1])]));
+  fichero = malloc(sizeof(char[strlen(argv[1])]));  //PRIMERO ALOCAMOS EL SIZE DEL FICHERO Y LUEGO LO PASAMOS
   fichero = argv[1];
   struct param args[productores];
-  for (i = 0; i < (productores - 1); i++) {
+  for (i = 0; i < (productores - 1); i++) { //LOOP PARA CREAR TANTOS HILOS COMO PRODUCTORES
     args[i].op = operaciones;
     args[i].id_ini = id_inicio;
 

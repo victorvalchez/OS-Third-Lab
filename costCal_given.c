@@ -63,7 +63,7 @@ int main (int argc, const char * argv[] ) {
 
 
     // We check if the number of arguments is correct.
-	if (argc != 5) { // 5 because the name of the program counts as one
+	if (argc != 4) {
     	perror("[ERROR] Invalid number of arguments");
     	return -1;
   	}
