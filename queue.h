@@ -1,20 +1,25 @@
+
 #ifndef HEADER_FILE
 #define HEADER_FILE
 
 struct element {
-  int type; // Machine type
-  int time; // Using time
+    // Machine type (common node, computation node or super-computer)
+    int machine_type; 
+    // Time of use (in minutes).
+    int time_of_use; 
 };
 
 typedef struct queue {
-  // Define the struct yourself
-  int length;
- // BORRAR ESTE COMENT Y EL DE ABAJO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  struct element *elements;  //Cambiar ring en el otro archivo por elements
-  int head;
-  int tail;
-  int size;
-}queue;
+    int length;
+    // BORRAR ESTE COMENT Y EL DE ABAJO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    struct element *elements;  //Cambiar ring en el otro archivo por elements
+    // Head of the queue.
+    int head;
+    // Tail of the queue.
+    int tail;
+    // Total size of the queue.
+    int size;
+} queue;
 
 queue *queue_init(int size);
 int queue_destroy(queue *q);
