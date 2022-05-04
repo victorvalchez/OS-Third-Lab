@@ -64,5 +64,5 @@ int queue_full(queue *q) {
 int queue_destroy(queue *q) {
   	free(q -> elements);
 	free(q);
-  return 0;
+    return 0;
 }
