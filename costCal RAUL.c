@@ -25,6 +25,18 @@ pthread_cond_t non_full;
 pthread_cond_t non_empty;
 
 
+// ESTO QUÉ ES??? -> Cambiar nombre y explicar !!!!
+FILE *descriptorP
+const char *file
+
+
+// !!!! STRUCTURE que hay que usar pero no sé para qué sirve  ????????
+struct opers {
+  int op1;
+  int op2;
+};
+
+
 
 void *producer(void * param) {
     /*
@@ -32,6 +44,43 @@ void *producer(void * param) {
     - Obtain data extracted from the file.
     - Insert data one by one in the circular buffer.
     */
+
+
+
+    // (CODE HERE)
+
+    
+
+    // We LOCK the mutex desc and check if there is any error.
+    if (pthread_mutex_lock(&desc) < 0) {
+        perror("[ERROR] Error while locking the mutex.");
+    	return -1;
+    }
+
+    // !!!! CAMBIAR NOMBRE A descriptorP CUANDO SE SEPA LO QUE ES !!!!
+    descriptorP = fopen(file, "r");
+    if (descriptorP == NULL) {
+        perror("[ERROR] Error while opening the file.");
+    	return -1;
+    }
+
+
+
+    // (CODE HERE)
+
+
+
+
+    // We UNLOCK the mutex desc and check if there is any error.
+    if (pthread_mutex_unlock(&desc) < 0) {
+        perror("[ERROR] Error while unlocking the mutex.");
+    	return -1;
+    }
+
+
+
+    // (INTRODUCE THINGS IN THE CIRCULAR BUFFER)
+    
 
     pthread_exit(0);
     // Line that should not be executed if pthread_exit(0) works as expected.
@@ -55,12 +104,7 @@ int *consumer(int * param) {
 }
 
 
-/**
- * Entry point
- * @param argc
- * @param argv
- * @return
- */
+
 int main (int argc, const char * argv[] ) {
     /*
     · Read the input arguments.
@@ -73,74 +117,131 @@ int main (int argc, const char * argv[] ) {
     · Show the total calculated cost.
     */
 
-    
-
-
     // We check if the number of arguments is correct.
 	if (argc != 4) {
     	perror("[ERROR] Invalid number of arguments (<file_name> <num_producers> <num_consumers> <buff_size>).");
     	return -1;
   	}
 
-    // We open the file given as argument.
+    /*
+    We define some integer variables that we will use later:
+        - num_operations -> Number of operations indicated by the user as argument in the call.
+        - num_lines -> Number of lines of the file specified as argument in the call.
+        - num_producers -> Number of producers indicated as argument in the call.
+        - num_consumers -> Number of consumers indicated as argument in the call.
+        - buff_size -> Size of the buffer (queue) given as argument in the call.
+    */
+    int num_operations, num_lines, num_producers, num_consumers, buff_size;
+    
+    // We extract the number of producers from the 2nd argument of the call.
+    num_producers = atoi(argv[2]);
+    if (num_producers <= 0) {
+        perror("[ERROR] Number of producers must be at least 1.");
+        return(-1);
+    }
+
+    // We extract the number of consumers from the 3th argument of the call.
+    num_consumers = atoi(argv[3]);
+    if (num_consumers <= 0) {
+        perror("[ERROR] Number of consumers must be at least 1.");
+        return(-1);
+    }
+
+    // We extract the size of the buffer from the 4th argument of the call.
+    buff_size = atoi(argv[4]);
+    if (buff_size <= 0) {
+        perror("[ERROR] Buffer size must be at least 1.");
+        return(-1);
+    }
+
+    // We open the file given as 1st argument and we store it into descriptor variable.
+    FILE *descriptor = fopen(argv[1], "r");
+
+    // We check if there was an error while opening the previous file.
+    if (descriptor == NULL) {
+        perror("[ERROR] Error while opening the file given as argument.");
+        return(-1);
+    }
+
+    // We extract the number of operations from the file (first line of the file).
+    if (fscan(descriptor, "%d", &num_operations) < 0) {
+        perror("[ERROR] Error looking for the number of operations.");
+        return(-1);
+    }
+
+    // Firstly, we calculate the number of operations of the file.
+    char chr;
+    // End of file (feof) is used to check whether we have checked the entire file to count the lines.
+    while(!feof(descriptor)) {
+        // Read a character.
+        chr = fgetc(descriptor);
+        // If the character is a line break, the counter (num_lines) is incremented.
+        if (chr == '\n') {
+            num_lines++
+        }
+    }
+    if (fclose(descriptor) < 0) {
+        perror("[ERROR] Error closing the file descriptor.");
+        return(-1);
+    }
+    
+    // We check that the number of operations is less or equal than the total lines.
+    // There may NOT be fewer operations in the file than the number of operations.
+    // Therefore, operations <= lines
+    // Note that num_lines - 1 is done since we do not consider the first line (number of operations).
+    int real_lines = num_lines - 1;
+    if (num_operations > real_lines) {
+        perror("[ERROR] There can not be fewer operations in the file than operations selected.");
+        return(-1);
+    }
+
+    // We create the buffer which is a queue in this case.
+    buffer = queue_init(buff_size);
+
+    // We initialize mutexes to deal with the shared buffer (queue).
+    // During initialization, check all them to see if there is any error.
+    if (pthread_mutex_init(&mutex, NULL) < 0) {
+        perror("[ERROR] Error in the initialization of the mutex.");
+        return(-1);
+    }
+    if (pthread_mutex_init(&desc, NULL) < 0) {
+        perror("[ERROR] Error in the initialization of the mutex.");
+        return(-1);
+    }
+    // Condition variable non_full.
+    if (pthread_mutex_init(&non_full, NULL) < 0) {
+        perror("[ERROR] Error in the initialization of the condition variable.");
+        return(-1);
+    }
+    // Condition variable non_empty.
+    if (pthread_mutex_init(&non_empty, NULL) < 0) {
+        perror("[ERROR] Error in the initialization of the condition variable.");
+        return(-1);
+    }
 
 
+    
 
-
-
-    // ¡¡¡ OBTENER ESTOS DOS PARÁMETROS DEL CALL AL PROGRAMA !!!
-    int num_producers;
-    int num_consumers;
-    pthread_t ths[num_producers + num_consumers]
+    // !!!!!!!!!! ESTO ES DEL VIDEO DE ALEJANDRO !!!!!!!!!! 
+    pthread_t threads[num_producers + num_consumers]
     // We initialize the threads needed.
 
     // For PRODUCERS.
     for(int i = 0; i < num_producers; i++) {
-        pthread_create(&(ths[i]), NULL, producer, &i);
-
+        pthread_create(&(threads[i]), NULL, producer, &i);
     }
 
     // For CONSUMERS.
     for(int i = 0; i < num_consumers; i++) {
-        pthread_create(&(ths[i]), NULL, consumer, &i);
-
+        pthread_create(&(threads[i]), NULL, consumer, &i);
     }
 
 
+
+
+
+    // (CREATION OF THREADS AND HOW MANY OPERATIONS DO EACH OF THEM)
     
-
-    
-
-
-    // We create the buffer which is a queue in this case.
-    buffer = queue_init(size);
-
-    // Mutexes to deal with the shared buffer (queue).
-    // During initialization, check all them to see if there is any error.
-    if (pthread_mutex_init(&mutex, NULL) < 0) {
-        perror("[ERROR] Error in the initialization of the mutex.")
-        return(-1)
-    }
-    if (pthread_mutex_init(&desc, NULL) < 0) {
-        perror("[ERROR] Error in the initialization of the mutex.")
-        return(-1)
-    }
-    // Condition variable non_full.
-    if (pthread_mutex_init(&non_full, NULL) < 0) {
-        perror("[ERROR] Error in the initialization of the condition variable.")
-        return(-1)
-    }
-    // Condition variable non_empty.
-    if (pthread_mutex_init(&non_empty, NULL) < 0) {
-        perror("[ERROR] Error in the initialization of the condition variable.")
-        return(-1)
-    }
-
-
-
-
-    
-
 
 
 
@@ -153,25 +254,31 @@ int main (int argc, const char * argv[] ) {
     queue_destroy(buffer)
 
     // We close the descriptors used (checking if there is any error).
-    if(fclose(descriptorP) < 0) {
-        perror("[ERROR] Error while closing the descriptor.")
+    if (fclose(descriptorP) < 0) {
+        perror("[ERROR] Error while closing the descriptor.");
+        return(-1);
     }
-    if(fclose(descriptor) < 0) {
-        perror("[ERROR] Error while closing the descriptor.")
+    if (fclose(descriptor) < 0) {
+        perror("[ERROR] Error while closing the descriptor.");
+        return(-1);
     }
     
     // We destroy all the mutexes and the conditional variables (checking if there is any error).
-    if(pthread_mutex_destroy(&mutex) < 0) {
-        perror("[ERROR] Error while destroying the mutex.")
+    if (pthread_mutex_destroy(&mutex) < 0) {
+        perror("[ERROR] Error while destroying the mutex.");
+        return(-1);
     }
-    if(pthread_mutex_destroy(&desc) < 0) {
-        perror("[ERROR] Error while destroying the mutex.")
+    if (pthread_mutex_destroy(&desc) < 0) {
+        perror("[ERROR] Error while destroying the mutex.");
+        return(-1);
     }
-    if(pthread_cond_destroy(&non_empty) < 0) {
-        perror("[ERROR] Error while destroying the conditional variable.")
+    if (pthread_cond_destroy(&non_empty) < 0) {
+        perror("[ERROR] Error while destroying the conditional variable.");
+        return(-1);
     }
-    if(pthread_cond_destroy(&non_full) < 0) {
-        perror("[ERROR] Error while destroying the conditional variable.")
+    if (pthread_cond_destroy(&non_full) < 0) {
+        perror("[ERROR] Error while destroying the conditional variable.");
+        return(-1);
     }
 
     // 0 is returned at the end of the main function.
