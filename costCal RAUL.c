@@ -13,7 +13,7 @@
 
 
 // Integer variable to store the total cost asked as a result.
-int total_cost;
+int total_cost = 0;
 
 // Mutex to access shared buffer.
 pthread_mutex_t mutex;
@@ -25,14 +25,14 @@ pthread_cond_t non_full;
 pthread_cond_t non_empty;
 
 
-// ESTO QUÉ ES??? -> Cambiar nombre y explicar !!!!
-FILE *descProducer;  //EL DESCRIPTOR DE LA FILE QUE LE METEMOS CON LAS OPERACIONES
-const char *file;
+// To get the descriptor of the file being processed
+FILE *descProducer;  
+const char *file; // To pass the file being processed argv[1] to this character
 
 // Structure which is the buffer (queue) defined in queue.c.
 struct queue *buffer;
 
-
+// CREO QUE YA NO HAY QUE USARLO (AL MENOS NO PARA PRODUCERS)
 // !!!! STRUCTURE que hay que usar pero no sé para qué sirve  ????????
 struct opers {
   int operations
@@ -55,7 +55,7 @@ void *producer(void *arg){ //Get the initial id and the number of operations for
   	}
 	//Get descriptor
   	descProducer = fopen(file, "r");
-  	if( descProducer == NULL){
+  	if(descProducer == NULL){
     	perror("[ERROR] Error while opening the file.");
     	exit(-1);
   	}
@@ -63,22 +63,76 @@ void *producer(void *arg){ //Get the initial id and the number of operations for
 	// Now, until we arrive to the line that the producer has to start on we keep looking
   	int counter = 0;
   	char character;
-  	while (counter < p->id_ini) {
+  	while (counter < p->initial_id) {
     	character = fgetc(descProducer);  //Read the whole line until you find a next line jump
     	if (character == '\n') {
-      	counter++;
+      		counter++;
     	}
   	}
-  	// Store the current position so we can res
+  	// Store the current position to get it again later (everytime fgetc is executed it moves to the next posisition in the file)
   	FILE *current = descProducer;
 
+  	if(pthread_mutex_unlock(&desc) < 0){
+    	perror("[ERROR] Error while unlocking the mutex.");
+    	exit(-1);
+  	}
 
-  if(pthread_mutex_unlock(&des) < 0){
-    perror("Error de mutex");
-    exit(-1);
-  }
+	//We create these variables to store the current's line operation id, type and machine
+	int id, type, time = 0;
+  	for (int i = p->operations; i > 0; i--) {
+    	// Get the values from the line and store the new position in the file
+    	if(pthread_mutex_lock(&desc) < 0){
+      		perror("[ERROR] Error while locking the mutex.");
+      		exit(-1);
+    	}
+		// We restore the current line of the file (just in case it was lost)
+    	descriptorP = current;
+		//Store the corresponding values in the variables created before
+    	if(fscanf(descriptorP, "%d %d %d", &id, &type, &time) < 0){
+      		perror("[ERROR] Error while getting the values from file.");
+      		exit(-1);
+    	}
+		//Get again the current position (as it changes with fscanf)
+    	current = descriptorP;
 	
+    	if(pthread_mutex_unlock(&desc) < 0){
+      		perror("[ERROR] Error while unlocking the mutex.");
+      		exit(-1);
+    	}
+
+		//Store the read data from the line to put it in the queue (buffer)
+		struct element current_data = {type, time}; //type, time
+
+    	if(pthread_mutex_lock(&mutex) < 0){
+      		perror("[ERROR] Error while locking the mutex.");
+      		exit(-1);
+    	}
+		//Check if the queue is full and wait for a consumer to signal non_full
+    	while (queue_full(buffer)){
+      		if(pthread_cond_wait(&non_full, &mutex) < 0){
+        		perror("[ERROR] Error while checking condition.");
+        		exit(-1);
+			}
+      	}
+		//Add the current line's data to the buffer
+		if(queue_put(buffer, &current_data) < 0){
+      		perror("[ERROR] Error while inserting data.");
+      		exit(-1);
+    	}
+		// In case it ws empty and the consumers were waiting for it to not be empty, signal non_empty
+    	if(pthread_cond_signal(&non_empty) < 0){
+      		perror("[ERROR] Error while checking condition.");
+      		exit(-1);
+    	}
+    	if(pthread_mutex_unlock(&mutex) < 0){
+      		perror("[ERROR] Error while unlocking the mutex.");
+      		exit(-1);
+    	}
+  	}
+	// Exit the current thread
+  	pthread_exit(0);
 }
+	
 
 /*
 void *producer(struct opers *argv) {
@@ -188,7 +242,7 @@ void *producer(void * param) {
 */
 
 
-
+// Num_operations is the number of operations each consumer has to do
 int *consumer(int * num_operations) {
      /*
     · CONSUMER THREAD:
@@ -197,19 +251,21 @@ int *consumer(int * num_operations) {
     - The consumer must calculate the cost and accumulate it until all elements have been processed.
     - Return to the main thread the partial cost calculated by each one.
     */
-
-    // Integer variable to store the partial cost that will be returned.
-    int partial_cost;
+	// Struct that contains the buffer data to be consumed
+	struct element content_read;
+	
+    /* // Integer variable to store the partial cost (cost of current line being consumed) that will be returned.
+    int partial_cost; */
     
     // Loop until operations requested have been processed.
-    for (int i = 0; k < *num_operations; i++) {
+    for (int i = 0; i < *num_operations; i++) {
         // We LOCK the mutex and check if there is any error.
         if (pthread_mutex_lock(&mutex) < 0) {
             perror("[ERROR] Error while locking the mutex.");
     	    return(-1);
         }
 
-        // !!! ESTO CREO QUE NO SERÍA ASÍ PARA N CONSUMIDORES
+        // !!! ESTO CREO QUE NO SERÍA ASÍ PARA N CONSUMIDORES (creo que si porque en los productores es igual)
         // We wait until the queue is empty.
         while (queue_empty(buffer) == 1) {
             if (pthread_cond_wait(&non_empty, &mutex) < 0) {
@@ -230,23 +286,23 @@ int *consumer(int * num_operations) {
         switch (content_read -> machine_type) {
             //The type of machine is: common_node (cost 3€/minute).
             case 1:
-                partial_cost += 3 * content_read -> time_of_use;
+                total_cost += 3 * content_read -> time_of_use;
                 break;
             //The type of machine is: computation_node (cost 6€/minute).
             case 2:
-                partial_cost += 6 * content_read -> time_of_use;
+                total_cost += 6 * content_read -> time_of_use;
                 break;
             //The type of machine is: super_computer (cost 15€/minute).
             case 3:
-                partial_cost += 15 * content_read -> time_of_use;
+                total_cost += 15 * content_read -> time_of_use;
                 break;
             // If the type of machine is not 1, 2 or 3, we consider the value as invalid.
             default:
                 perror("[ERROR] Invalid type of machine.");
     	        return (-1);
         }
-
-        if (pthread_cond_signal(&non_empty) < 0) {
+		// In case any producer was waiting to produce, we signal that it is not full
+        if (pthread_cond_signal(&non_full) < 0) {
             perror("[ERROR] Error in the condition variable while signal.");
     	    return (-1);
         }
@@ -256,14 +312,7 @@ int *consumer(int * num_operations) {
             perror("[ERROR] Error while unlocking the mutex.");
     	    return(-1);
         }
-        
     }
-
-    // The partial cost is returned by the consumer.
-    return partial_cost;
-
-    // MIRAR EN EL MAIN COMO SUMAR TODOS LOS PARTIAL_COST EN LA VARIABLE GLOBAL TOTAL_COST.
-    
 }
 
 
