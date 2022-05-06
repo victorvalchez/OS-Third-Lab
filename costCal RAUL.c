@@ -12,6 +12,12 @@
 #include <unistd.h>
 #include <math.h>
 
+/**
+ * Entry point
+ * @param argc
+ * @param argv
+ * @return
+ */
 
 // Integer variable to store the total cost asked as a result.
 int total_cost = 0;
@@ -33,20 +39,20 @@ const char *file; // To pass the file being processed argv[1] to this character
 // Structure which is the buffer (queue) defined in queue.c.
 struct queue *buffer;
 
-// This structure contains the number of operations and the starting line for each producer and consumer
-struct params{
+// This structures contain the number of operations and the starting line for each producer and consumer
+struct producer_params {
+  int initial_id;
   int operations;
-  int init;
 };
 
-struct producers_params {
+struct consumer_params {
   int initial_id;
   int operations;
 };
 
 void *producer(void *arg){ //Get the initial id and the number of operations for each producer
 	// Get the corresponding id and operations in the structure
-  	struct producers_params *p = arg;
+  	struct producer_params *p = arg;
 
 	//Get the descriptor of the initial line
   	if(pthread_mutex_lock(&desc) < 0){
@@ -243,7 +249,7 @@ void *producer(void * param) {
 
 
 // Num_operations is the number of operations each consumer has to do
-int *consumer(int *num_operations) {
+void *consumer(void *arg) {
      /*
     · CONSUMER THREAD:
     - Obtain (concurrently) the elements inserted in the queue.
@@ -254,11 +260,13 @@ int *consumer(int *num_operations) {
 	// Struct that contains the buffer data to be consumed
 	struct element content_read;
 	
+    // Struct for the operations
+    struct producer_params *consumers = arg;
     /* // Integer variable to store the partial cost (cost of current line being consumed) that will be returned.
     int partial_cost; */
     
     // Loop until operations requested have been processed.
-    for (int i = 0; i < *num_operations; i++) {
+    for (int i = 0; i < consumers->operations; i++) {
         // We LOCK the mutex and check if there is any error.
         if (pthread_mutex_lock(&mutex) < 0) {
             perror("[ERROR] Error while locking the mutex.");
@@ -313,6 +321,7 @@ int *consumer(int *num_operations) {
     	    exit(-1);
         }
     }
+    pthread_exit(0);
 }
 
 
@@ -457,14 +466,14 @@ int main (int argc, const char * argv[] ) {
     // Setup initial pointer to 1 (as the line 0.
     init = 1;
     // Structure variable to store the parameters of the thread (operations and initial position).
-    struct params consumer_args[num_consumers];
+    struct consumer_params consumer_args[num_consumers];
 
     // We create the threads for the CONSUMERS.
 	int i;
-    for (i = 0; i < (num_producers - 1); i++ ) {
+    for (i = 0; i < (num_consumers - 1); i++ ) {
         // Parameters of the thread.
         consumer_args[i].operations= consumer_operations;
-        consumer_args[i].init = init;
+        consumer_args[i].initial_id = init;
 
         if (pthread_create(&consumer_threads[i], NULL, (void*)consumer, &consumer_args[i]) < 0) {
             perror("[ERROR] Error while creating a consumer thread.");
@@ -479,7 +488,7 @@ int main (int argc, const char * argv[] ) {
     // Check how many operations has the last consumer, since the last one has less operations (remainder of floor division).
     int last_consumer_operations = num_operations - (i * consumer_operations);
     consumer_args[num_consumers - 1].operations = last_consumer_operations;
-    consumer_args[num_consumers - 1].init = init;
+    consumer_args[num_consumers - 1].initial_id = init;
 
 	// Create the thread for the remaining consumer
     if (pthread_create(&consumer_threads[num_consumers - 1], NULL, (void*)consumer, &consumer_args[num_consumers - 1]) < 0) {
@@ -492,15 +501,14 @@ int main (int argc, const char * argv[] ) {
     // Setup initial pointer to 1.
     init = 1;
     // Structure variable to store the parameters of the thread (operations and initial position).
-    struct params
-	producer_args[num_producers];
+    struct producer_params producer_args[num_producers];
     
     // We create the threads for the PRODUCERS.
 	int j;
     for (j = 0; j < (num_producers - 1); j++) {
         // Parameters of the thread.
         producer_args[j].operations = producer_operations;
-        producer_args[j].init = init;
+        producer_args[j].initial_id = init;
 
         if (pthread_create(&producer_threads[j], NULL, (void*)producer, &producer_args[j]) < 0) {
             perror("[ERROR] Error while creating a producer thread.");
@@ -515,13 +523,14 @@ int main (int argc, const char * argv[] ) {
     // Check how many operations have the last producer, since the last one has less operations.
     int last_producer_operations = num_operations - (j * producer_operations);
     producer_args[num_producers - 1].operations = last_producer_operations;
-    producer_args[num_producers - 1].init = init;
+    producer_args[num_producers - 1].initial_id = init;
 
     if (pthread_create(&producer_threads[num_producers - 1], NULL, (void*)producer, &producer_args[num_producers - 1]) < 0) {
         perror("[ERROR] Error while creating the last producer thread.");
         return(-1);
     }
 
+    // Wait for both producers and consumers
     // Loop to wait (using pthread_join) for all the consumer threads.
     for (int i = 0; i < num_consumers; i++) {
         if (pthread_join(consumer_threads[i], NULL) < 0) {
