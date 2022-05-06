@@ -26,8 +26,11 @@ pthread_cond_t non_empty;
 
 
 // ESTO QUÉ ES??? -> Cambiar nombre y explicar !!!!
-FILE *descriptorP
-const char *file
+FILE *descriptorP;
+const char *file;
+
+// Structure variable which is the buffer (queue) defined in queue.c.
+struct queue *buffer;
 
 
 // !!!! STRUCTURE que hay que usar pero no sé para qué sirve  ????????
@@ -74,7 +77,7 @@ void *producer(void * param) {
     // We UNLOCK the mutex desc and check if there is any error.
     if (pthread_mutex_unlock(&desc) < 0) {
         perror("[ERROR] Error while unlocking the mutex.");
-    	return -1;
+    	return(-1);
     }
 
 
@@ -89,7 +92,7 @@ void *producer(void * param) {
 
 
 
-int *consumer(int * param) {
+int *consumer(int * num_operations) {
      /*
     · CONSUMER THREAD:
     - Obtain (concurrently) the elements inserted in the queue.
@@ -98,8 +101,69 @@ int *consumer(int * param) {
     - Return to the main thread the partial cost calculated by each one.
     */
 
-    pthread_exit(0);
-    return NULL;
+    // Integer variable to store the partial cost that will be returned.
+    int partial_cost;
+    
+    // Loop until operations requested have been processed.
+    for (int i = 0; k < *num_operations; i++) {
+        // We LOCK the mutex and check if there is any error.
+        if (pthread_mutex_lock(&mutex) < 0) {
+            perror("[ERROR] Error while locking the mutex.");
+    	    return(-1);
+        }
+
+        // !!! ESTO CREO QUE NO SERÍA ASÍ PARA N CONSUMIDORES
+        // We wait until the queue is empty.
+        while (queue_empty(buffer) == 1) {
+            if (pthread_cond_wait(&non_empty, &mutex) < 0) {
+                perror("[ERROR] Error in the condition variable while waiting.");
+    	        return (-1);
+            }
+        }
+
+        // Structure variable to store the line read from the queue.
+        struct element *content_read = queue_get(buffer);
+
+        if (content_read == NULL) {
+            perror("[ERROR] Data not found.");
+    	    return (-1);
+        }
+
+        // Switch to see what to do depending on the type of the element of the queue (type of machine).
+        switch (content_read -> machine_type) {
+            //The type of machine is: common_node (cost 3€/minute).
+            case 1:
+                partial_cost += 3 * content_read -> time_of_use;
+                break;
+            //The type of machine is: computation_node (cost 6€/minute).
+            case 2:
+                partial_cost += 6 * content_read -> time_of_use;
+                break;
+            //The type of machine is: super_computer (cost 15€/minute).
+            case 3:
+                partial_cost += 15 * content_read -> time_of_use;
+                break;
+            // If the type of machine is not 1, 2 or 3, we consider the value as invalid.
+            default:
+                perror("[ERROR] Invalid type of machine.");
+    	        return (-1);
+        }
+
+        if (pthread_cond_signal(&non_empty) < 0) {
+            perror("[ERROR] Error in the condition variable while signal.");
+    	    return (-1);
+        }
+
+        // We UNLOCK the mutex and check if there is any error.
+        if (pthread_mutex_unlock(&mutex) < 0) {
+            perror("[ERROR] Error while unlocking the mutex.");
+    	    return(-1);
+        }
+        
+    }
+
+    // The partial cost is returned by the consumer.
+    return partial_cost;
     
 }
 
