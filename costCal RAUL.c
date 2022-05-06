@@ -32,21 +32,20 @@ const char *file; // To pass the file being processed argv[1] to this character
 // Structure which is the buffer (queue) defined in queue.c.
 struct queue *buffer;
 
-// CREO QUE YA NO HAY QUE USARLO (AL MENOS NO PARA PRODUCERS)
-// !!!! STRUCTURE que hay que usar pero no sé para qué sirve  ????????
-struct opers {
-  int operations
+// This structure contains the number of operations and the starting line for each producer and consumer
+struct params{
+  int operations;
   int init;
 };
 
 struct producers_params {
-  int intial_id;
+  int initial_id;
   int operations;
 };
 
 void *producer(void *arg){ //Get the initial id and the number of operations for each producer
 	// Get the corresponding id and operations in the structure
-  	struct param *p = arg;
+  	struct producers_params *p = arg;
 
 	//Get the descriptor of the initial line
   	if(pthread_mutex_lock(&desc) < 0){
@@ -135,7 +134,7 @@ void *producer(void *arg){ //Get the initial id and the number of operations for
 	
 
 /*
-void *producer(struct opers *argv) {
+void *producer(struct params*argv) {
     
     · PRODUCER THREAD:
     - Obtain data extracted from the file.
@@ -243,7 +242,7 @@ void *producer(void * param) {
 
 
 // Num_operations is the number of operations each consumer has to do
-int *consumer(int * num_operations) {
+int *consumer(int *num_operations) {
      /*
     · CONSUMER THREAD:
     - Obtain (concurrently) the elements inserted in the queue.
@@ -329,8 +328,8 @@ int main (int argc, const char * argv[] ) {
     · Show the total calculated cost.
     */
 
-    // We check if the number of arguments is correct.
-	if (argc != 4) {
+    // We check if the number of arguments is correct. (5 because the argv[0] is the name of the file)
+	if (argc != 5) {
     	perror("[ERROR] Invalid number of arguments (<file_name> <num_producers> <num_consumers> <buff_size>).");
     	return -1;
   	}
@@ -382,13 +381,13 @@ int main (int argc, const char * argv[] ) {
     }
 
     // Firstly, we calculate the number of operations of the file.
-    char chr;
+    char character;
     // End of file (feof) is used to check whether we have checked the entire file to count the lines.
     while(!feof(descriptor)) {
         // Read a character.
-        chr = fgetc(descriptor);
+        character = fgetc(descriptor);
         // If the character is a line break, the counter (num_lines) is incremented.
-        if (chr == '\n') {
+        if (character == '\n') {
             num_lines++
         }
     }
@@ -407,7 +406,7 @@ int main (int argc, const char * argv[] ) {
         return(-1);
     }
 
-    // We create the buffer which is a queue in this case.
+    // We create the buffer which is a queue in this case, with the size introduced.
     buffer = queue_init(buff_size);
 
     // We initialize mutexes to deal with the shared buffer (queue).
@@ -431,18 +430,13 @@ int main (int argc, const char * argv[] ) {
         return(-1);
     }
 
-
-
-
-
     
-
-    // Index to point to the beginning (initial) state.
+    // Index to point to the beginning (initial) line.
     int init;
 
     // We define the number of operations that each producer must insert into the circular buffer.
     // To avoid problems during distribution, we will use the floor function.
-    int consumer_operations = floor((num_operations / num_producers));
+    int consumer_operations = floor((num_operations / num_consumers));
     
     // We define the number of operations that each producer must insert into the circular buffer.
     // To avoid problems during distribution, we will use the floor function.
@@ -452,21 +446,22 @@ int main (int argc, const char * argv[] ) {
     pthread_t consumer_threads[num_consumers];
     pthread_t producer_threads[num_producers];
 
-    // !!?!??!?!?!? ESTO CÓMO FUNCIONA !!?!??!?!?!?
-    // We use malloc to reserve the dynamic memory.
+    // We use malloc to reserve the dynamic memory for storing the file.
     file = malloc(sizeof(char[strlen(argv[1])]));
     file = argv[1];
 
 
 
-    
-    // Setup initial pointer to 1.
+    // ------ CONSUMERS --------
+    // Setup initial pointer to 1 (as the line 0.
     init = 1;
     // Structure variable to store the parameters of the thread (operations and initial position).
-    struct opers consumer_args[num_consumers];
+    struct params
+consumer_args[num_consumers];
 
     // We create the threads for the CONSUMERS.
-    for (int i = 0; i < (num_consumers - 1); i++ ) {
+	int i;
+    for (i = 0; i < (num_producers - 1); i++ ) {
         // Parameters of the thread.
         consumer_args[i] -> operations = consumer_operations;
         consumer_args[i] -> init = init;
@@ -481,25 +476,28 @@ int main (int argc, const char * argv[] ) {
         init += consumer_operations;
     }
 
-    // Check how many operations have the last condumer, since the last one has less operations.
+    // Check how many operations has the last consumer, since the last one has less operations (remainder of floor division).
     int last_consumer_operations = num_operations - (i * operations);
-    producer_args[num_consumers - 1] -> operations = last_consumer_operations;
-    producer_args[num_consumers - 1] -> init = init;
+    consumer_args[num_consumers - 1] -> operations = last_consumer_operations;
+    consumer_args[num_consumers - 1] -> init = init;
 
+	// Create the thread for the remaining consumer
     if (pthread_create(&consumer_threads[num_consumers - 1], NULL, (void*)consumer, &consumer_args[num_consumers - 1]) < 0) {
         perror("[ERROR] Error while creating the last consumer thread.");
         return(-1);
 
 
 
-        
+    // ----- PRODUCERS -----
     // Setup initial pointer to 1.
     init = 1;
     // Structure variable to store the parameters of the thread (operations and initial position).
-    struct opers producer_args[num_producers];
+    struct params
+	producer_args[num_producers];
     
     // We create the threads for the PRODUCERS.
-    for (int i = 0; i < (num_producers - 1); i++) {
+	int i;
+    for (i = 0; i < (num_producers - 1); i++) {
         // Parameters of the thread.
         producer_args[i] -> operations = producer_operations;
         producer_args[i] -> init = init;
@@ -542,11 +540,11 @@ int main (int argc, const char * argv[] ) {
         }
     }
     
-    // The final total cost (sum of partial costs) is printed on screen.
-    printf("Total: %d euros.\n", total_cost)
+    // The final total cost is printed on screen.
+    printf("Total: %d euros.\n", total_cost);
 
     // We invoke queue_destroy to destroy the queue and free the assigned resources.
-    queue_destroy(buffer)
+    queue_destroy(buffer);
 
     // We close the descriptors used (checking if there is any error).
     if (fclose(descProducer) < 0) {
