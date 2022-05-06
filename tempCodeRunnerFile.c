@@ -10,7 +10,6 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
-#include <math.h>
 
 
 // Integer variable to store the total cost asked as a result.
@@ -262,7 +261,7 @@ int *consumer(int *num_operations) {
         // We LOCK the mutex and check if there is any error.
         if (pthread_mutex_lock(&mutex) < 0) {
             perror("[ERROR] Error while locking the mutex.");
-    	    exit(-1);
+    	    return(-1);
         }
 
         // !!! ESTO CREO QUE NO SERÍA ASÍ PARA N CONSUMIDORES (creo que si porque en los productores es igual)
@@ -270,7 +269,7 @@ int *consumer(int *num_operations) {
         while (queue_empty(buffer) == 1) {
             if (pthread_cond_wait(&non_empty, &mutex) < 0) {
                 perror("[ERROR] Error in the condition variable while waiting.");
-    	        exit (-1);
+    	        return (-1);
             }
         }
 
@@ -279,7 +278,7 @@ int *consumer(int *num_operations) {
 
         if (content_read == NULL) {
             perror("[ERROR] Data not found.");
-    	    exit (-1);
+    	    return (-1);
         }
 
         // Switch to see what to do depending on the type of machine of the element of the queue.
@@ -299,18 +298,18 @@ int *consumer(int *num_operations) {
             // If the type of machine is not 1, 2 or 3, we consider the value as invalid.
             default:
                 perror("[ERROR] Invalid type of machine.");
-    	        exit(-1);
+    	        return (-1);
         }
 		// In case any producer was waiting to produce, we signal that it is not full
         if (pthread_cond_signal(&non_full) < 0) {
             perror("[ERROR] Error in the condition variable while signal.");
-    	    exit(-1);
+    	    return (-1);
         }
 
         // We UNLOCK the mutex and check if there is any error.
         if (pthread_mutex_unlock(&mutex) < 0) {
             perror("[ERROR] Error while unlocking the mutex.");
-    	    exit(-1);
+    	    return(-1);
         }
     }
 }
@@ -376,7 +375,7 @@ int main (int argc, const char * argv[] ) {
     }
 
     // We extract the number of operations from the file (first line of the file).
-    if (fscanf(descriptor, "%d", &num_operations) < 0) {
+    if (fscan(descriptor, "%d", &num_operations) < 0) {
         perror("[ERROR] Error looking for the number of operations.");
         return(-1);
     }
@@ -421,12 +420,12 @@ int main (int argc, const char * argv[] ) {
         return(-1);
     }
     // Condition variable non_full.
-    if (pthread_cond_init(&non_full, NULL) < 0) {
+    if (pthread_mutex_init(&non_full, NULL) < 0) {
         perror("[ERROR] Error in the initialization of the condition variable.");
         return(-1);
     }
     // Condition variable non_empty.
-    if (pthread_cond_init(&non_empty, NULL) < 0) {
+    if (pthread_mutex_init(&non_empty, NULL) < 0) {
         perror("[ERROR] Error in the initialization of the condition variable.");
         return(-1);
     }
@@ -485,7 +484,7 @@ int main (int argc, const char * argv[] ) {
     if (pthread_create(&consumer_threads[num_consumers - 1], NULL, (void*)consumer, &consumer_args[num_consumers - 1]) < 0) {
         perror("[ERROR] Error while creating the last consumer thread.");
         return(-1);
-    }
+
 
 
     // ----- PRODUCERS -----
@@ -496,13 +495,13 @@ int main (int argc, const char * argv[] ) {
 	producer_args[num_producers];
     
     // We create the threads for the PRODUCERS.
-	int j;
-    for (j = 0; j < (num_producers - 1); j++) {
+	int i;
+    for (i = 0; i < (num_producers - 1); i++) {
         // Parameters of the thread.
-        producer_args[j].operations = producer_operations;
-        producer_args[j].init = init;
+        producer_args[i].operations = producer_operations;
+        producer_args[i].init = init;
 
-        if (pthread_create(&producer_threads[j], NULL, (void*)producer, &producer_args[j]) < 0) {
+        if (pthread_create(&producer_threads[i], NULL, (void*)producer, &producer_args[i]) < 0) {
             perror("[ERROR] Error while creating a producer thread.");
             return(-1);
         }
@@ -513,7 +512,7 @@ int main (int argc, const char * argv[] ) {
     }
 
     // Check how many operations have the last producer, since the last one has less operations.
-    int last_producer_operations = num_operations - (j * producer_operations);
+    int last_producer_operations = num_operations - (i * producer_operations);
     producer_args[num_producers - 1].operations = last_producer_operations;
     producer_args[num_producers - 1].init = init;
 

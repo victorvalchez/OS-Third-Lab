@@ -37,7 +37,7 @@ struct param {
   int op;
 };
 
-// Cada hilo tiene acceso a su propio dominio de id`s, donde el nº de operaciones que tendrá asociado será
+// Cada hilo tiene acceso a su propio dominio de id`s (numero de filas a realizar), donde el nº de operaciones que tendrá asociado será
 // floor(num.lineas/num.productores), leerá e insertará de uno en uno
 void *producir(void *arg) {
   // Sacar parametros
@@ -54,6 +54,7 @@ void *producir(void *arg) {
     perror("Error al abrir fichero");
     exit(-1);
   }
+  // Aqui lo que hace es ir linea por linea
   int counter = 0;
   char chr;
   while (counter < p->id_ini) {
@@ -93,7 +94,7 @@ void *producir(void *arg) {
       exit(-1);
     }
 
-    struct element temporal = {i1, i2};
+    struct element temporal = {i1, i2}; //type, time
 
     if(pthread_mutex_lock(&elements) < 0){
       perror("Error de mutex");
