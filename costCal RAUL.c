@@ -26,7 +26,7 @@ pthread_cond_t non_empty;
 
 
 // ESTO QUÉ ES??? -> Cambiar nombre y explicar !!!!
-FILE *descriptorP;  //EL DESCRIPTOR DE LA FILE QUE LE METEMOS CON LAS OPERACIONES
+FILE *descProducer;  //EL DESCRIPTOR DE LA FILE QUE LE METEMOS CON LAS OPERACIONES
 const char *file;
 
 // Structure which is the buffer (queue) defined in queue.c.
@@ -35,21 +35,58 @@ struct queue *buffer;
 
 // !!!! STRUCTURE que hay que usar pero no sé para qué sirve  ????????
 struct opers {
-  int op1;
-  int op2;
+  int operations
+  int init;
 };
 
-int *op1array;
-int *op2array;
+struct producers_params {
+  int intial_id;
+  int operations;
+};
+
+void *producer(void *arg){ //Get the initial id and the number of operations for each producer
+	// Get the corresponding id and operations in the structure
+  	struct param *p = arg;
+
+	//Get the descriptor of the initial line
+  	if(pthread_mutex_lock(&desc) < 0){
+    	perror("[ERROR] Error while locking the mutex.");
+    	exit(-1);
+  	}
+	//Get descriptor
+  	descProducer = fopen(file, "r");
+  	if( descProducer == NULL){
+    	perror("[ERROR] Error while opening the file.");
+    	exit(-1);
+  	}
+
+	// Now, until we arrive to the line that the producer has to start on we keep looking
+  	int counter = 0;
+  	char character;
+  	while (counter < p->id_ini) {
+    	character = fgetc(descProducer);  //Read the whole line until you find a next line jump
+    	if (character == '\n') {
+      	counter++;
+    	}
+  	}
+  	// Store the current position so we can res
+  	FILE *current = descProducer;
 
 
+  if(pthread_mutex_unlock(&des) < 0){
+    perror("Error de mutex");
+    exit(-1);
+  }
+	
+}
 
+/*
 void *producer(struct opers *argv) {
-    /*
+    
     · PRODUCER THREAD:
     - Obtain data extracted from the file.
     - Insert data one by one in the circular buffer.
-    */
+    
 
     // We create a new element that will be enqueued in the circular buffer.
 	struct element new_element;  //This corresponds to a structure having the machine type and the time of use
@@ -96,7 +133,7 @@ void *producer(struct opers *argv) {
 	}
 	pthread_exit(0);
 }
-
+*/
 
 
 /*
@@ -119,9 +156,9 @@ void *producer(void * param) {
     	return -1;
     }
 
-    // !!!! CAMBIAR NOMBRE A descriptorP CUANDO SE SEPA LO QUE ES !!!!
-    descriptorP = fopen(file, "r");
-    if (descriptorP == NULL) {
+    // !!!! CAMBIAR NOMBRE A descProducer CUANDO SE SEPA LO QUE ES !!!!
+    descProducer = fopen(file, "r");
+    if (descProducer == NULL) {
         perror("[ERROR] Error while opening the file.");
     	return -1;
     }
@@ -351,11 +388,8 @@ int main (int argc, const char * argv[] ) {
 
     
 
-    // Index to iterate through operations.
-    int index;
-
     // Index to point to the beginning (initial) state.
-    int init = 1;
+    int init;
 
     // We define the number of operations that each producer must insert into the circular buffer.
     // To avoid problems during distribution, we will use the floor function.
@@ -369,50 +403,80 @@ int main (int argc, const char * argv[] ) {
     pthread_t consumer_threads[num_consumers];
     pthread_t producer_threads[num_producers];
 
+    // !!?!??!?!?!? ESTO CÓMO FUNCIONA !!?!??!?!?!?
     // We use malloc to reserve the dynamic memory.
     file = malloc(sizeof(char[strlen(argv[1])]));
     file = argv[1];
 
-    struct opers args[num_producers];
 
-    /*
+
+    
+    // Setup initial pointer to 1.
+    init = 1;
+    // Structure variable to store the parameters of the thread (operations and initial position).
+    struct opers consumer_args[num_consumers];
+
     // We create the threads for the CONSUMERS.
-    index = 0;
     for (int i = 0; i < (num_consumers - 1); i++ ) {
-        args[i] -> op1 = consumer_operations;
-        args[i] -> op2 = id;
+        // Parameters of the thread.
+        consumer_args[i] -> operations = consumer_operations;
+        consumer_args[i] -> init = init;
 
-        if (pthread_create(&consumer_threads, NULL, (void*)consumer, &args[i]) < 0) {
+        if (pthread_create(&consumer_threads[i], NULL, (void*)consumer, &consumer_args[i]) < 0) {
             perror("[ERROR] Error while creating a consumer thread.");
             return(-1);
         }
 
-        // We put the index (pointer) in the position of the next set of operations that the next producer will insert.
-        index += consumer_operations;
+        // We put the init (pointer) in the position of the next set of operations that the next producer will insert.
+        // In this case, consumer_operations acts as an offset.
+        init += consumer_operations;
     }
-    */
+
+    // Check how many operations have the last condumer, since the last one has less operations.
+    int last_consumer_operations = num_operations - (i * operations);
+    producer_args[num_consumers - 1] -> operations = last_consumer_operations;
+    producer_args[num_consumers - 1] -> init = init;
+
+    if (pthread_create(&consumer_threads[num_consumers - 1], NULL, (void*)consumer, &consumer_args[num_consumers - 1]) < 0) {
+        perror("[ERROR] Error while creating the last consumer thread.");
+        return(-1);
+
+
+
+        
+    // Setup initial pointer to 1.
+    init = 1;
+    // Structure variable to store the parameters of the thread (operations and initial position).
+    struct opers producer_args[num_producers];
     
     // We create the threads for the PRODUCERS.
-    index = 0;
     for (int i = 0; i < (num_producers - 1); i++) {
-        args[i] -> op1 = producer_operations;
-        args[i] -> op2 = id;
+        // Parameters of the thread.
+        producer_args[i] -> operations = producer_operations;
+        producer_args[i] -> init = init;
 
-        if (pthread_create(&producer_threads, NULL, (void*)producer, &args[i]) < 0) {
+        if (pthread_create(&producer_threads[i], NULL, (void*)producer, &producer_args[i]) < 0) {
             perror("[ERROR] Error while creating a producer thread.");
             return(-1);
         }
 
-        // We put the index (pointer) in the position of the next set of operations that the next producer will insert.
-        index += producer_operations;
+        // We put the init (pointer) in the position of the next set of operations that the next producer will insert.
+        // In this case, producer_operations acts as an offset.
+        init += producer_operations;
     }
 
-    
-    
+    // Check how many operations have the last producer, since the last one has less operations.
+    int last_producer_operations = num_operations - (i * operations);
+    producer_args[num_producers - 1] -> operations = last_producer_operations;
+    producer_args[num_producers - 1] -> init = init;
+
+    if (pthread_create(&producer_threads[num_producers - 1], NULL, (void*)producer, &producer_args[num_producers - 1]) < 0) {
+        perror("[ERROR] Error while creating the last producer thread.");
+        return(-1);
 
 
-    
-    
+
+        
     // Loop to wait (using pthread_join) for all the consumer threads.
     for (int i = 0; i < num_consumers; i++) {
         if (pthread_join(consumer_threads[i], NULL) < 0) {
@@ -428,12 +492,6 @@ int main (int argc, const char * argv[] ) {
             return(-1);
         }
     }
-
-
-
-
-
-    
     
     // The final total cost (sum of partial costs) is printed on screen.
     printf("Total: %d euros.\n", total_cost)
@@ -442,7 +500,7 @@ int main (int argc, const char * argv[] ) {
     queue_destroy(buffer)
 
     // We close the descriptors used (checking if there is any error).
-    if (fclose(descriptorP) < 0) {
+    if (fclose(descProducer) < 0) {
         perror("[ERROR] Error while closing the descriptor.");
         return(-1);
     }
