@@ -26,10 +26,10 @@ pthread_cond_t non_empty;
 
 
 // ESTO QUÉ ES??? -> Cambiar nombre y explicar !!!!
-FILE *descriptorP;
+FILE *descriptorP;  //EL DESCRIPTOR DE LA FILE QUE LE METEMOS CON LAS OPERACIONES
 const char *file;
 
-// Structure variable which is the buffer (queue) defined in queue.c.
+// Structure which is the buffer (queue) defined in queue.c.
 struct queue *buffer;
 
 
@@ -52,7 +52,7 @@ void *producer(struct opers *argv) {
     */
 
     // We create a new element that will be enqueued in the circular buffer.
-	struct element new_element;
+	struct element new_element;  //This corresponds to a structure having the machine type and the time of use
 
     
 	for (int i = argv -> op1; i < argv -> op2; i++) {
@@ -189,7 +189,7 @@ int *consumer(int * num_operations) {
     	    return (-1);
         }
 
-        // Switch to see what to do depending on the type of the element of the queue (type of machine).
+        // Switch to see what to do depending on the type of machine of the element of the queue.
         switch (content_read -> machine_type) {
             //The type of machine is: common_node (cost 3€/minute).
             case 1:
@@ -224,6 +224,8 @@ int *consumer(int * num_operations) {
 
     // The partial cost is returned by the consumer.
     return partial_cost;
+
+    // MIRAR EN EL MAIN COMO SUMAR TODOS LOS PARTIAL_COST EN LA VARIABLE GLOBAL TOTAL_COST.
     
 }
 
@@ -344,33 +346,95 @@ int main (int argc, const char * argv[] ) {
     }
 
 
+
+
+
     
 
-    // !!!!!!!!!! ESTO ES DEL VIDEO DE ALEJANDRO !!!!!!!!!! 
-    pthread_t threads[num_producers + num_consumers]
-    // We initialize the threads needed.
+    // Index to iterate through operations.
+    int index;
 
-    // For PRODUCERS.
-    for(int i = 0; i < num_producers; i++) {
-        pthread_create(&(threads[i]), NULL, producer, &i);
+    // Index to point to the beginning (initial) state.
+    int init = 1;
+
+    // We define the number of operations that each producer must insert into the circular buffer.
+    // To avoid problems during distribution, we will use the floor function.
+    int consumer_operations = floor((num_operations / num_producers));
+    
+    // We define the number of operations that each producer must insert into the circular buffer.
+    // To avoid problems during distribution, we will use the floor function.
+    int producer_operations = floor((num_operations / num_producers));
+
+    // We define as much threads as producers and consumers we have (array of threads).
+    pthread_t consumer_threads[num_consumers];
+    pthread_t producer_threads[num_producers];
+
+    // We use malloc to reserve the dynamic memory.
+    file = malloc(sizeof(char[strlen(argv[1])]));
+    file = argv[1];
+
+    struct opers args[num_producers];
+
+    /*
+    // We create the threads for the CONSUMERS.
+    index = 0;
+    for (int i = 0; i < (num_consumers - 1); i++ ) {
+        args[i] -> op1 = consumer_operations;
+        args[i] -> op2 = id;
+
+        if (pthread_create(&consumer_threads, NULL, (void*)consumer, &args[i]) < 0) {
+            perror("[ERROR] Error while creating a consumer thread.");
+            return(-1);
+        }
+
+        // We put the index (pointer) in the position of the next set of operations that the next producer will insert.
+        index += consumer_operations;
+    }
+    */
+    
+    // We create the threads for the PRODUCERS.
+    index = 0;
+    for (int i = 0; i < (num_producers - 1); i++) {
+        args[i] -> op1 = producer_operations;
+        args[i] -> op2 = id;
+
+        if (pthread_create(&producer_threads, NULL, (void*)producer, &args[i]) < 0) {
+            perror("[ERROR] Error while creating a producer thread.");
+            return(-1);
+        }
+
+        // We put the index (pointer) in the position of the next set of operations that the next producer will insert.
+        index += producer_operations;
     }
 
-    // For CONSUMERS.
-    for(int i = 0; i < num_consumers; i++) {
-        pthread_create(&(threads[i]), NULL, consumer, &i);
-    }
-
-
-
-
-
-    // (CREATION OF THREADS AND HOW MANY OPERATIONS DO EACH OF THEM)
+    
     
 
 
+    
+    
+    // Loop to wait (using pthread_join) for all the consumer threads.
+    for (int i = 0; i < num_consumers; i++) {
+        if (pthread_join(consumer_threads[i], NULL) < 0) {
+            perror("[ERROR] Error while waiting for a consumer thread.");
+            return(-1);
+        }
+    }
+
+    // Loop to wait (using pthread_join) for all the producer threads.
+    for (int i = 0; i < num_producers; i++) {
+        if (pthread_join(producer_threads[i], NULL) < 0) {
+            perror("[ERROR] Error while waiting for a producer thread.");
+            return(-1);
+        }
+    }
 
 
 
+
+
+    
+    
     // The final total cost (sum of partial costs) is printed on screen.
     printf("Total: %d euros.\n", total_cost)
 
