@@ -39,14 +39,73 @@ struct opers {
   int op2;
 };
 
+int *op1array;
+int *op2array;
 
 
-void *producer(void * param) {
+
+void *producer(struct opers *argv) {
     /*
     · PRODUCER THREAD:
     - Obtain data extracted from the file.
     - Insert data one by one in the circular buffer.
     */
+
+    // We create a new element that will be enqueued in the circular buffer.
+	struct element new_element;
+
+    
+	for (int i = argv -> op1; i < argv -> op2; i++) {
+
+        // We assign the machine type and the time of use to the new_element structure.
+		new_element -> machine_type = op1array[i];
+		new_element -> time_of_use = op2array[i];
+
+        // We LOCK the mutex and check if there is any error.
+		if (pthread_mutex_lock(&mutex) < 0){
+			perror("[ERROR] Error while locking the mutex.");
+    	    return(-1);
+		}
+        
+        // We try to access the queue but it blocks the running thread if it is full.
+		while (queue_full(buffer) == 1){
+			if (pthread_cond_wait(&non_full, &mutex) < 0) {
+        			perror("[ERROR] Error in conditional variable non_full while waiting.");
+    	            return(-1);
+      			}
+		}
+
+        // We enqueue the new element created with the machine type and the time of use and check if there is any error.
+		if (queue_put(buffer, &new_element) < 0) {
+      			perror("[ERROR] Error while enqueue.");
+    	        return(-1);
+    		}
+
+        // We unlock one or more threads suspended in the condition variable non_empty.
+		if (pthread_cond_signal(&non_empty) < 0) {
+			perror("[ERROR] Error in conditional variable non_empty while signal.");
+    	    return(-1);
+		}
+        
+        // We UNLOCK the mutex and check if there is any error.
+		if (pthread_mutex_unlock(&mutex) < 0) {
+			perror("[ERROR] Error while unlocking the mutex.");
+    	    return(-1);		
+		}
+		
+	}
+	pthread_exit(0);
+}
+
+
+
+/*
+void *producer(void * param) {
+
+    · PRODUCER THREAD:
+    - Obtain data extracted from the file.
+    - Insert data one by one in the circular buffer.
+
 
 
 
@@ -89,6 +148,7 @@ void *producer(void * param) {
     // Line that should not be executed if pthread_exit(0) works as expected.
     return NULL;
 }
+*/
 
 
 
