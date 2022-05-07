@@ -554,10 +554,6 @@ int main (int argc, const char * argv[] ) {
         perror("[ERROR] Error while closing the descriptor.");
         return(-1);
     }
-    if (fclose(descriptor) < 0) {
-        perror("[ERROR] Error while closing the descriptor.");
-        return(-1);
-    }
     
     // We destroy all the mutexes and the conditional variables (checking if there is any error).
     if (pthread_mutex_destroy(&mutex) < 0) {
