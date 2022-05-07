@@ -46,7 +46,6 @@ struct producer_params {
 };
 
 struct consumer_params {
-  int initial_id;
   int operations;
 };
 
@@ -261,7 +260,7 @@ void *consumer(void *arg) {
 	struct element content_read;
 	
     // Struct for the operations
-    struct producer_params *consumers = arg;
+    struct consumer_params *consumers = arg;
     /* // Integer variable to store the partial cost (cost of current line being consumed) that will be returned.
     int partial_cost; */
     
@@ -505,7 +504,6 @@ int main (int argc, const char * argv[] ) {
     for (i = 0; i < (num_consumers - 1); i++ ) {
         // Parameters of the thread.
         consumer_args[i].operations= consumer_operations;
-        consumer_args[i].initial_id = init;
 
         if (pthread_create(&consumer_threads[i], NULL, (void*)consumer, &consumer_args[i]) < 0) {
             perror("[ERROR] Error while creating a consumer thread.");
@@ -520,7 +518,6 @@ int main (int argc, const char * argv[] ) {
     // Check how many operations has the last consumer, since the last one has less operations (remainder of floor division).
     int last_consumer_operations = num_operations - (i * consumer_operations);
     consumer_args[num_consumers - 1].operations = last_consumer_operations;
-    consumer_args[num_consumers - 1].initial_id = init;
 
 	// Create the thread for the remaining consumer
     if (pthread_create(&consumer_threads[num_consumers - 1], NULL, (void*)consumer, &consumer_args[num_consumers - 1]) < 0) {
