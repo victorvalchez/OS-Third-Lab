@@ -461,6 +461,38 @@ int main (int argc, const char * argv[] ) {
     file = argv[1];
 
 
+    // ----- PRODUCERS -----
+    // Setup initial pointer to 1.
+    init = 1;
+    // Structure variable to store the parameters of the thread (operations and initial position).
+    struct producer_params producer_args[num_producers];
+    
+    // We create the threads for the PRODUCERS.
+	int j;
+    for (j = 0; j < (num_producers - 1); j++) {
+        // Parameters of the thread.
+        producer_args[j].operations = producer_operations;
+        producer_args[j].initial_id = init;
+
+        if (pthread_create(&producer_threads[j], NULL, (void*)producer, &producer_args[j]) < 0) {
+            perror("[ERROR] Error while creating a producer thread.");
+            return(-1);
+        }
+
+        // We put the init (pointer) in the position of the next set of operations that the next producer will insert.
+        // In this case, producer_operations acts as an offset.
+        init += producer_operations;
+    }
+
+    // Check how many operations have the last producer, since the last one has less operations.
+    int last_producer_operations = num_operations - (j * producer_operations);
+    producer_args[num_producers - 1].operations = last_producer_operations;
+    producer_args[num_producers - 1].initial_id = init;
+
+    if (pthread_create(&producer_threads[num_producers - 1], NULL, (void*)producer, &producer_args[num_producers - 1]) < 0) {
+        perror("[ERROR] Error while creating the last producer thread.");
+        return(-1);
+    }
 
     // ------ CONSUMERS --------
     // Setup initial pointer to 1 (as the line 0.
@@ -496,39 +528,6 @@ int main (int argc, const char * argv[] ) {
         return(-1);
     }
 
-
-    // ----- PRODUCERS -----
-    // Setup initial pointer to 1.
-    init = 1;
-    // Structure variable to store the parameters of the thread (operations and initial position).
-    struct producer_params producer_args[num_producers];
-    
-    // We create the threads for the PRODUCERS.
-	int j;
-    for (j = 0; j < (num_producers - 1); j++) {
-        // Parameters of the thread.
-        producer_args[j].operations = producer_operations;
-        producer_args[j].initial_id = init;
-
-        if (pthread_create(&producer_threads[j], NULL, (void*)producer, &producer_args[j]) < 0) {
-            perror("[ERROR] Error while creating a producer thread.");
-            return(-1);
-        }
-
-        // We put the init (pointer) in the position of the next set of operations that the next producer will insert.
-        // In this case, producer_operations acts as an offset.
-        init += producer_operations;
-    }
-
-    // Check how many operations have the last producer, since the last one has less operations.
-    int last_producer_operations = num_operations - (j * producer_operations);
-    producer_args[num_producers - 1].operations = last_producer_operations;
-    producer_args[num_producers - 1].initial_id = init;
-
-    if (pthread_create(&producer_threads[num_producers - 1], NULL, (void*)producer, &producer_args[num_producers - 1]) < 0) {
-        perror("[ERROR] Error while creating the last producer thread.");
-        return(-1);
-    }
 
     // Wait for both producers and consumers
     // Loop to wait (using pthread_join) for all the consumer threads.
