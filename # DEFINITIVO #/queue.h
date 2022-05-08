@@ -1,23 +1,24 @@
 #ifndef HEADER_FILE
 #define HEADER_FILE
 
+
+// Structure representing an element (operation) of the queue (buffer).
 struct element {
-    // Machine type (common node, computation node or super-computer)
+    // Machine type (common node, computation node or super-computer).
     int machine_type; 
     // Time of use (in minutes).
     int time_of_use; 
 };
 
+
+// Structure representing the queue (buffer).
 typedef struct queue {
-    int length;
+    // Elements of the queue.
     struct element *elements;
-    // Head of the queue.
-    int head;
-    // Tail of the queue.
-    int tail;
-    // Total size of the queue.
-    int size;
+    // Length, head, tail and total size of the queue.
+    int length, head, tail, size;
 } queue;
+
 
 queue *queue_init(int size);
 int queue_destroy(queue *q);

@@ -1,4 +1,3 @@
-
 #include "queue.h"
 #include <fcntl.h>
 #include <pthread.h>
@@ -12,12 +11,10 @@
 #include <unistd.h>
 #include <math.h>
 
-/**
- * Entry point
- * @param argc
- * @param argv
- * @return
- */
+
+// Declaration of functions for the producer and consumer that will be used.
+void *producer(void *arg);
+void *consumer(void *arg);
 
 // Integer variable to store the total cost asked as a result.
 int total_cost = 0;
@@ -33,196 +30,35 @@ pthread_cond_t non_empty;
 
 
 // To get the descriptor of the file being processed.
-FILE *descProducer;  
-const char *file; // To pass the file being processed argv[1] to this character.
+FILE *descProducer;
+// To pass the file being processed argv[1] to this character.
+const char *file;
 
 // Structure which is the buffer (queue) defined in queue.c.
 struct queue *buffer;
 
-// This structures contain the number of operations and the starting line for each producer and consumer
+// This structures contain the number of operations and the starting line for each producer and consumer.
 struct producer_params {
   int initial_id;
   int operations;
 };
 
+// In case of consumers, only the number of operations is considered.
 struct consumer_params {
   int operations;
 };
 
 
 
-void *producer(void *arg){ //Get the initial id and the number of operations for each producer.
-	// Get the corresponding id and operations in the structure.
-  	struct producer_params *p = arg;
-
-	//Get the descriptor of the initial line.
-  	if(pthread_mutex_lock(&desc) < 0){
-    	perror("[ERROR] Error while locking the mutex.\n");
-    	exit(-1);
-  	}
-    
-	//Get descriptor.
-  	descProducer = fopen(file, "r");
-  	if(descProducer == NULL){
-    	perror("[ERROR] Error while opening the file.\n");
-    	exit(-1);
-  	}
-
-	// Now, until we arrive to the line that the producer has to start on we keep looking.
-  	int counter = 0;
-  	char character;
-  	while (counter < p->initial_id) {
-    	character = fgetc(descProducer);  //Read the whole line until you find a next line jump.
-    	if (character == '\n') {
-      		counter++;
-    	}
-  	}
-  	// Store the current position to get it again later (everytime fgetc is executed it moves to the next posisition in the file).
-  	FILE *current = descProducer;
-
-  	if(pthread_mutex_unlock(&desc) < 0){
-    	perror("[ERROR] Error while unlocking the mutex.\n");
-    	exit(-1);
-  	}
-
-	//We create these variables to store the current's line operation id, type and machine.
-	int id, type, time = 0;
-  	for (int i = p->operations; i > 0; i--) {
-    	// Get the values from the line and store the new position in the file.
-    	if(pthread_mutex_lock(&desc) < 0){
-      		perror("[ERROR] Error while locking the mutex.\n");
-      		exit(-1);
-    	}
-		// We restore the current line of the file (just in case it was lost).
-    	descProducer = current;
-		//Store the corresponding values in the variables created before.
-    	if(fscanf(descProducer, "%d %d %d", &id, &type, &time) < 0){
-      		perror("[ERROR] Error while getting the values from file.\n");
-      		exit(-1);
-    	}
-		//Get again the current position (as it changes with fscanf).
-    	current = descProducer;
-	
-    	if(pthread_mutex_unlock(&desc) < 0){
-      		perror("[ERROR] Error while unlocking the mutex.\n");
-      		exit(-1);
-    	}
-
-		//Store the read data from the line to put it in the queue (buffer).
-		struct element current_data = {type, time}; //type, time
-
-    	if(pthread_mutex_lock(&mutex) < 0){
-      		perror("[ERROR] Error while locking the mutex.\n");
-      		exit(-1);
-    	}
-		//Check if the queue is full and wait for a consumer to signal non_full.
-    	while (queue_full(buffer)){
-      		if(pthread_cond_wait(&non_full, &mutex) < 0){
-        		perror("[ERROR] Error while checking condition.\n");
-        		exit(-1);
-			}
-      	}
-		//Add the current line's data to the buffer.
-		if(queue_put(buffer, &current_data) < 0){
-      		perror("[ERROR] Error while inserting data.\n");
-      		exit(-1);
-    	}
-		// In case it ws empty and the consumers were waiting for it to not be empty, signal non_empty.
-    	if(pthread_cond_signal(&non_empty) < 0){
-      		perror("[ERROR] Error while checking condition.\n");
-      		exit(-1);
-    	}
-    	if(pthread_mutex_unlock(&mutex) < 0){
-      		perror("[ERROR] Error while unlocking the mutex.\n");
-      		exit(-1);
-    	}
-  	}
-	// Exit the current thread.
-  	pthread_exit(0);
-}
-
-
-
-// Num_operations is the number of operations each consumer has to do
-void *consumer(void *arg) {
-     /*
-    · CONSUMER THREAD:
-    - Obtain (concurrently) the elements inserted in the queue.
-    - Each extracted element represents a type of machine and the time of use.
-    - The consumer must calculate the cost and accumulate it until all elements have been processed.
-    - Return to the main thread the partial cost calculated by each one.
-    */
-	// Struct that contains the buffer data to be consumed
-	struct element content_read;
-	
-    // Struct for the operations
-    struct consumer_params *consumers = arg;
-    /* // Integer variable to store the partial cost (cost of current line being consumed) that will be returned.
-    int partial_cost; */
-    
-    // Loop until operations requested have been processed.
-    for (int i = 0; i < consumers->operations; i++) {
-        // We LOCK the mutex and check if there is any error.
-        if (pthread_mutex_lock(&mutex) < 0) {
-            perror("[ERROR] Error while locking the mutex.\n");
-    	    exit(-1);
-        }
-
-        // !!! ESTO CREO QUE NO SERÍA ASÍ PARA N CONSUMIDORES (creo que si porque en los productores es igual)
-        // We wait until the queue is empty.
-        while (queue_empty(buffer) == 1) {
-            if (pthread_cond_wait(&non_empty, &mutex) < 0) {
-                perror("[ERROR] Error in the condition variable while waiting.\n");
-    	        exit (-1);
-            }
-        }
-
-        // Structure variable to store the line read from the queue.
-        struct element *content_read = queue_get(buffer);
-
-        if (content_read == NULL) {
-            perror("[ERROR] Data not found.\n");
-    	    exit (-1);
-        }
-
-        // Switch to see what to do depending on the type of machine of the element of the queue.
-        switch (content_read -> machine_type) {
-            //The type of machine is: common_node (cost 3€/minute).
-            case 1:
-                total_cost += 3 * content_read -> time_of_use;
-                break;
-            //The type of machine is: computation_node (cost 6€/minute).
-            case 2:
-                total_cost += 6 * content_read -> time_of_use;
-                break;
-            //The type of machine is: super_computer (cost 15€/minute).
-            case 3:
-                total_cost += 15 * content_read -> time_of_use;
-                break;
-            // If the type of machine is not 1, 2 or 3, we consider the value as invalid.
-            default:
-                perror("[ERROR] Invalid type of machine.\n");
-    	        exit(-1);
-        }
-		// In case any producer was waiting to produce, we signal that it is not full
-        if (pthread_cond_signal(&non_full) < 0) {
-            perror("[ERROR] Error in the condition variable while signal.\n");
-    	    exit(-1);
-        }
-
-        // We UNLOCK the mutex and check if there is any error.
-        if (pthread_mutex_unlock(&mutex) < 0) {
-            perror("[ERROR] Error while unlocking the mutex.\n");
-    	    exit(-1);
-        }
-    }
-    pthread_exit(0);
-}
-
-
-
+/**
+ * Entry point
+ * @param argc
+ * @param argv
+ * @return
+ */
 int main (int argc, const char * argv[] ) {
     /*
+    The main function is responsible of several tasks:
     · Read the input arguments.
     · Load the data from the file provided into memory.
     · Distribute the file load equally among the number of producers threads indicated.
@@ -236,7 +72,7 @@ int main (int argc, const char * argv[] ) {
     // We check if the number of arguments is correct. (5 because the argv[0] is the name of the file)
 	if (argc != 5) {
     	perror("[ERROR] Invalid number of arguments (<file_name> <num_producers> <num_consumers> <buff_size>).\n");
-    	return -1;
+    	return(-1);
   	}
 
     /*
@@ -297,6 +133,7 @@ int main (int argc, const char * argv[] ) {
             num_lines++;
         }
     }
+    // We check for errors while closing the descriptor.
     if (fclose(descriptor) < 0) {
         perror("[ERROR] Error closing the file descriptor.\n");
         return(-1);
@@ -312,7 +149,7 @@ int main (int argc, const char * argv[] ) {
         return(-1);
     }
 
-    // We create the buffer which is a queue in this case, with the size introduced.
+    // We create the buffer which is a queue in this case, with the size introduced as argument.
     buffer = queue_init(buff_size);
 
     // We initialize mutexes to deal with the shared buffer (queue).
@@ -370,6 +207,7 @@ int main (int argc, const char * argv[] ) {
         producer_args[j].operations = producer_operations;
         producer_args[j].initial_id = init;
 
+        // Check for errors during thread creation.
         if (pthread_create(&producer_threads[j], NULL, (void*)producer, &producer_args[j]) < 0) {
             perror("[ERROR] Error while creating a producer thread.\n");
             return(-1);
@@ -385,14 +223,13 @@ int main (int argc, const char * argv[] ) {
     producer_args[num_producers - 1].operations = last_producer_operations;
     producer_args[num_producers - 1].initial_id = init;
 
+    // Create the thread for the remaining producer.
     if (pthread_create(&producer_threads[num_producers - 1], NULL, (void*)producer, &producer_args[num_producers - 1]) < 0) {
         perror("[ERROR] Error while creating the last producer thread.\n");
         return(-1);
     }
 
     // ------ CONSUMERS --------
-    // Setup initial pointer to 1 (as the line 0.
-    init = 1;
     // Structure variable to store the parameters of the thread (operations and initial position).
     struct consumer_params consumer_args[num_consumers];
 
@@ -402,28 +239,24 @@ int main (int argc, const char * argv[] ) {
         // Parameters of the thread.
         consumer_args[i].operations= consumer_operations;
 
+        // Check for errors during thread creation.
         if (pthread_create(&consumer_threads[i], NULL, (void*)consumer, &consumer_args[i]) < 0) {
             perror("[ERROR] Error while creating a consumer thread.\n");
             return(-1);
         }
-
-        // We put the init (pointer) in the position of the next set of operations that the next producer will insert.
-        // In this case, consumer_operations acts as an offset.
-        init += consumer_operations;
     }
 
     // Check how many operations has the last consumer, since the last one has less operations (remainder of floor division).
     int last_consumer_operations = num_operations - (i * consumer_operations);
     consumer_args[num_consumers - 1].operations = last_consumer_operations;
 
-	// Create the thread for the remaining consumer
+	// Create the thread for the remaining consumer.
     if (pthread_create(&consumer_threads[num_consumers - 1], NULL, (void*)consumer, &consumer_args[num_consumers - 1]) < 0) {
         perror("[ERROR] Error while creating the last consumer thread.\n");
         return(-1);
     }
 
-
-    // Wait for both producers and consumers
+    // Wait for both producers and consumers.
     // Loop to wait (using pthread_join) for all the consumer threads.
     for (int i = 0; i < num_consumers; i++) {
         if (pthread_join(consumer_threads[i], NULL) < 0) {
@@ -472,4 +305,183 @@ int main (int argc, const char * argv[] ) {
 
     // 0 is returned at the end of the main function.
     return 0;
+}
+
+
+
+void *producer(void *arg) {
+    // Gets the initial id and the number of operations for each producer.
+	// Get the corresponding id and operations in the structure.
+  	struct producer_params *p = arg;
+
+	// Check for errors while locking the desc mutex.
+  	if(pthread_mutex_lock(&desc) < 0) {
+    	perror("[ERROR] Error while locking the mutex.\n");
+    	exit(-1);
+  	}
+    
+	// Get the descriptor of the initial line.
+  	descProducer = fopen(file, "r");
+
+    // Check for errors while opening the file.
+  	if(descProducer == NULL) {
+    	perror("[ERROR] Error while opening the file.\n");
+    	exit(-1);
+  	}
+
+	// Now, until we arrive to the line that the producer has to start on we keep looking.
+    char character;
+  	int counter = 0;
+    
+    // Read the whole line until you find a next line jump.
+  	while (counter < p -> initial_id) {
+    	character = fgetc(descProducer);  
+    	if (character == '\n') {
+      		counter++;
+    	}
+  	}
+    
+  	// Store the current position to get it again later (everytime fgetc is executed it moves to the next posisition in the file).
+  	FILE *current = descProducer;
+
+    // Check for errors while unlocking the desc mutex.
+  	if(pthread_mutex_unlock(&desc) < 0) {
+    	perror("[ERROR] Error while unlocking the mutex.\n");
+    	exit(-1);
+  	}
+
+	// We create these variables to store the current's line operation id, machine_type and time_of_use.
+	int id, machine_type, time_of_use = 0;
+    
+  	for (int i = p -> operations; i > 0; i--) {
+        // Check for errors while locking the mutex.
+    	if(pthread_mutex_lock(&desc) < 0){
+      		perror("[ERROR] Error while locking the mutex.\n");
+      		exit(-1);
+    	}
+        
+		// We restore the current line of the file (just in case it was lost).
+    	descProducer = current;
+        
+		// Store the corresponding values in the variables created before.
+    	if(fscanf(descProducer, "%d %d %d", &id, &machine_type, &time_of_use) < 0) {
+      		perror("[ERROR] Error while getting the values from file.\n");
+      		exit(-1);
+    	}
+        
+		// Get again the current position (as it changes with fscanf).
+    	current = descProducer;
+
+        // Check for errors while unlocking the desc mutex.
+    	if(pthread_mutex_unlock(&desc) < 0){
+      		perror("[ERROR] Error while unlocking the mutex.\n");
+      		exit(-1);
+    	}
+
+		// Store the read data from the line (machine_type and time_of_use) to put it in the queue (buffer).
+		struct element current_data = {machine_type, time_of_use};
+
+        // Check for errors while locking the mutex.
+    	if (pthread_mutex_lock(&mutex) < 0){
+      		perror("[ERROR] Error while locking the mutex.\n");
+      		exit(-1);
+    	}
+        
+		// Check if the queue is full and wait for a consumer to signal non_full.
+    	while (queue_full(buffer)) {
+      		if (pthread_cond_wait(&non_full, &mutex) < 0){
+        		perror("[ERROR] Error while checking condition.\n");
+        		exit(-1);
+			}
+      	}
+        
+		// Add the current line's data to the buffer.
+		if (queue_put(buffer, &current_data) < 0) {
+      		perror("[ERROR] Error while inserting data.\n");
+      		exit(-1);
+    	}
+        
+		// In case it ws empty and the consumers were waiting for it to not be empty, signal non_empty.
+    	if (pthread_cond_signal(&non_empty) < 0) {
+      		perror("[ERROR] Error while checking condition.\n");
+      		exit(-1);
+    	}
+
+        // Check for errors while unlocking the mutex.
+    	if (pthread_mutex_unlock(&mutex) < 0) {
+      		perror("[ERROR] Error while unlocking the mutex.\n");
+      		exit(-1);
+    	}
+  	}
+    
+	// Exit the current thread.
+  	pthread_exit(0);
+}
+
+
+
+void *consumer(void *arg) {
+	// Struct that contains the buffer data to be consumed.
+	struct element content_read;
+	
+    // Struct for the operations
+    struct consumer_params *consumers = arg;
+    
+    // Loop until operations requested have been processed.
+    for (int i = 0; i < consumers -> operations; i++) {
+        // We LOCK the mutex and check if there is any error.
+        if (pthread_mutex_lock(&mutex) < 0) {
+            perror("[ERROR] Error while locking the mutex.\n");
+    	    exit(-1);
+        }
+
+        // We wait until the queue is empty.
+        while (queue_empty(buffer) == 1) {
+            if (pthread_cond_wait(&non_empty, &mutex) < 0) {
+                perror("[ERROR] Error in the condition variable while waiting.\n");
+    	        exit (-1);
+            }
+        }
+
+        // Structure variable to store the line read from the queue.
+        struct element *content_read = queue_get(buffer);
+
+        // If no data is found, an error is raised.
+        if (content_read == NULL) {
+            perror("[ERROR] Data not found.\n");
+    	    exit(-1);
+        }
+
+        // Switch to see what to do depending on the type of machine of the element of the queue.
+        switch (content_read -> machine_type) {
+            //The type of machine is: common_node (cost 3€/minute).
+            case 1:
+                total_cost += 3 * content_read -> time_of_use;
+                break;
+            //The type of machine is: computation_node (cost 6€/minute).
+            case 2:
+                total_cost += 6 * content_read -> time_of_use;
+                break;
+            //The type of machine is: super_computer (cost 15€/minute).
+            case 3:
+                total_cost += 15 * content_read -> time_of_use;
+                break;
+            // If the type of machine is not 1, 2 or 3, we consider the value as invalid.
+            default:
+                perror("[ERROR] Invalid type of machine.\n");
+    	        exit(-1);
+        }
+		// In case any producer was waiting to produce, we signal that it is not full.
+        if (pthread_cond_signal(&non_full) < 0) {
+            perror("[ERROR] Error in the condition variable while signal.\n");
+    	    exit(-1);
+        }
+
+        // We UNLOCK the mutex and check if there is any error.
+        if (pthread_mutex_unlock(&mutex) < 0) {
+            perror("[ERROR] Error while unlocking the mutex.\n");
+    	    exit(-1);
+        }
+    }
+    pthread_exit(0);
 }
