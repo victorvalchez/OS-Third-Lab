@@ -1,4 +1,3 @@
-
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -6,13 +5,17 @@
 #include <limits.h>
 #include "queue.h"
 
+/*
+Queue functions implementations:
+https://www.geeksforgeeks.org/queue-set-1introduction-and-array-implementation/
+*/
 
 // To create a queue and reserve the size specified as a parameter.
 queue *queue_init(int size) {
 	// Create the queue.
   	queue *q = (queue *)malloc(sizeof(queue));
 
-	//Asign the default values.
+	//Assign the default values.
   	q -> elements = malloc(size * sizeof(struct element));
   	q -> size = size;
   	q -> length = 0;

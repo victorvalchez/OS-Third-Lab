@@ -1,4 +1,3 @@
-
 #ifndef HEADER_FILE
 #define HEADER_FILE
 
@@ -11,8 +10,7 @@ struct element {
 
 typedef struct queue {
     int length;
-    // BORRAR ESTE COMENT Y EL DE ABAJO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    struct element *elements;  //Cambiar ring en el otro archivo por elements
+    struct element *elements;
     // Head of the queue.
     int head;
     // Tail of the queue.

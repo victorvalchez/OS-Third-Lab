@@ -32,9 +32,9 @@ pthread_cond_t non_full;
 pthread_cond_t non_empty;
 
 
-// To get the descriptor of the file being processed
+// To get the descriptor of the file being processed.
 FILE *descProducer;  
-const char *file; // To pass the file being processed argv[1] to this character
+const char *file; // To pass the file being processed argv[1] to this character.
 
 // Structure which is the buffer (queue) defined in queue.c.
 struct queue *buffer;
@@ -49,92 +49,93 @@ struct consumer_params {
   int operations;
 };
 
-void *producer(void *arg){ //Get the initial id and the number of operations for each producer
-	// Get the corresponding id and operations in the structure
+void *producer(void *arg){ //Get the initial id and the number of operations for each producer.
+	// Get the corresponding id and operations in the structure.
   	struct producer_params *p = arg;
 
-	//Get the descriptor of the initial line
+	//Get the descriptor of the initial line.
   	if(pthread_mutex_lock(&desc) < 0){
-    	perror("[ERROR] Error while locking the mutex.");
+    	perror("[ERROR] Error while locking the mutex.\n");
     	exit(-1);
   	}
-	//Get descriptor
+    
+	//Get descriptor.
   	descProducer = fopen(file, "r");
   	if(descProducer == NULL){
-    	perror("[ERROR] Error while opening the file.");
+    	perror("[ERROR] Error while opening the file.\n");
     	exit(-1);
   	}
 
-	// Now, until we arrive to the line that the producer has to start on we keep looking
+	// Now, until we arrive to the line that the producer has to start on we keep looking.
   	int counter = 0;
   	char character;
   	while (counter < p->initial_id) {
-    	character = fgetc(descProducer);  //Read the whole line until you find a next line jump
+    	character = fgetc(descProducer);  //Read the whole line until you find a next line jump.
     	if (character == '\n') {
       		counter++;
     	}
   	}
-  	// Store the current position to get it again later (everytime fgetc is executed it moves to the next posisition in the file)
+  	// Store the current position to get it again later (everytime fgetc is executed it moves to the next posisition in the file).
   	FILE *current = descProducer;
 
   	if(pthread_mutex_unlock(&desc) < 0){
-    	perror("[ERROR] Error while unlocking the mutex.");
+    	perror("[ERROR] Error while unlocking the mutex.\n");
     	exit(-1);
   	}
 
-	//We create these variables to store the current's line operation id, type and machine
+	//We create these variables to store the current's line operation id, type and machine.
 	int id, type, time = 0;
   	for (int i = p->operations; i > 0; i--) {
-    	// Get the values from the line and store the new position in the file
+    	// Get the values from the line and store the new position in the file.
     	if(pthread_mutex_lock(&desc) < 0){
-      		perror("[ERROR] Error while locking the mutex.");
+      		perror("[ERROR] Error while locking the mutex.\n");
       		exit(-1);
     	}
-		// We restore the current line of the file (just in case it was lost)
+		// We restore the current line of the file (just in case it was lost).
     	descProducer = current;
-		//Store the corresponding values in the variables created before
+		//Store the corresponding values in the variables created before.
     	if(fscanf(descProducer, "%d %d %d", &id, &type, &time) < 0){
-      		perror("[ERROR] Error while getting the values from file.");
+      		perror("[ERROR] Error while getting the values from file.\n");
       		exit(-1);
     	}
-		//Get again the current position (as it changes with fscanf)
+		//Get again the current position (as it changes with fscanf).
     	current = descProducer;
 	
     	if(pthread_mutex_unlock(&desc) < 0){
-      		perror("[ERROR] Error while unlocking the mutex.");
+      		perror("[ERROR] Error while unlocking the mutex.\n");
       		exit(-1);
     	}
 
-		//Store the read data from the line to put it in the queue (buffer)
+		//Store the read data from the line to put it in the queue (buffer).
 		struct element current_data = {type, time}; //type, time
 
     	if(pthread_mutex_lock(&mutex) < 0){
-      		perror("[ERROR] Error while locking the mutex.");
+      		perror("[ERROR] Error while locking the mutex.\n");
       		exit(-1);
     	}
-		//Check if the queue is full and wait for a consumer to signal non_full
+		//Check if the queue is full and wait for a consumer to signal non_full.
     	while (queue_full(buffer)){
       		if(pthread_cond_wait(&non_full, &mutex) < 0){
-        		perror("[ERROR] Error while checking condition.");
+        		perror("[ERROR] Error while checking condition.\n");
         		exit(-1);
 			}
       	}
-		//Add the current line's data to the buffer
+		//Add the current line's data to the buffer.
 		if(queue_put(buffer, &current_data) < 0){
-      		perror("[ERROR] Error while inserting data.");
+      		perror("[ERROR] Error while inserting data.\n");
       		exit(-1);
     	}
-		// In case it ws empty and the consumers were waiting for it to not be empty, signal non_empty
+		// In case it ws empty and the consumers were waiting for it to not be empty, signal non_empty.
     	if(pthread_cond_signal(&non_empty) < 0){
-      		perror("[ERROR] Error while checking condition.");
+      		perror("[ERROR] Error while checking condition.\n");
       		exit(-1);
     	}
     	if(pthread_mutex_unlock(&mutex) < 0){
-      		perror("[ERROR] Error while unlocking the mutex.");
+      		perror("[ERROR] Error while unlocking the mutex.\n");
       		exit(-1);
     	}
   	}
-	// Exit the current thread
+	// Exit the current thread.
   	pthread_exit(0);
 }
 	
@@ -268,7 +269,7 @@ void *consumer(void *arg) {
     for (int i = 0; i < consumers->operations; i++) {
         // We LOCK the mutex and check if there is any error.
         if (pthread_mutex_lock(&mutex) < 0) {
-            perror("[ERROR] Error while locking the mutex.");
+            perror("[ERROR] Error while locking the mutex.\n");
     	    exit(-1);
         }
 
@@ -276,7 +277,7 @@ void *consumer(void *arg) {
         // We wait until the queue is empty.
         while (queue_empty(buffer) == 1) {
             if (pthread_cond_wait(&non_empty, &mutex) < 0) {
-                perror("[ERROR] Error in the condition variable while waiting.");
+                perror("[ERROR] Error in the condition variable while waiting.\n");
     	        exit (-1);
             }
         }
@@ -285,7 +286,7 @@ void *consumer(void *arg) {
         struct element *content_read = queue_get(buffer);
 
         if (content_read == NULL) {
-            perror("[ERROR] Data not found.");
+            perror("[ERROR] Data not found.\n");
     	    exit (-1);
         }
 
@@ -305,18 +306,18 @@ void *consumer(void *arg) {
                 break;
             // If the type of machine is not 1, 2 or 3, we consider the value as invalid.
             default:
-                perror("[ERROR] Invalid type of machine.");
+                perror("[ERROR] Invalid type of machine.\n");
     	        exit(-1);
         }
 		// In case any producer was waiting to produce, we signal that it is not full
         if (pthread_cond_signal(&non_full) < 0) {
-            perror("[ERROR] Error in the condition variable while signal.");
+            perror("[ERROR] Error in the condition variable while signal.\n");
     	    exit(-1);
         }
 
         // We UNLOCK the mutex and check if there is any error.
         if (pthread_mutex_unlock(&mutex) < 0) {
-            perror("[ERROR] Error while unlocking the mutex.");
+            perror("[ERROR] Error while unlocking the mutex.\n");
     	    exit(-1);
         }
     }
@@ -339,7 +340,7 @@ int main (int argc, const char * argv[] ) {
 
     // We check if the number of arguments is correct. (5 because the argv[0] is the name of the file)
 	if (argc != 5) {
-    	perror("[ERROR] Invalid number of arguments (<file_name> <num_producers> <num_consumers> <buff_size>).");
+    	perror("[ERROR] Invalid number of arguments (<file_name> <num_producers> <num_consumers> <buff_size>).\n");
     	return -1;
   	}
 
@@ -356,21 +357,21 @@ int main (int argc, const char * argv[] ) {
     // We extract the number of producers from the 2nd argument of the call.
     num_producers = atoi(argv[2]);
     if (num_producers <= 0) {
-        perror("[ERROR] Number of producers must be at least 1.");
+        perror("[ERROR] Number of producers must be at least 1.\n");
         return(-1);
     }
 
     // We extract the number of consumers from the 3th argument of the call.
     num_consumers = atoi(argv[3]);
     if (num_consumers <= 0) {
-        perror("[ERROR] Number of consumers must be at least 1.");
+        perror("[ERROR] Number of consumers must be at least 1.\n");
         return(-1);
     }
 
     // We extract the size of the buffer from the 4th argument of the call.
     buff_size = atoi(argv[4]);
     if (buff_size <= 0) {
-        perror("[ERROR] Buffer size must be at least 1.");
+        perror("[ERROR] Buffer size must be at least 1.\n");
         return(-1);
     }
 
@@ -379,13 +380,13 @@ int main (int argc, const char * argv[] ) {
 
     // We check if there was an error while opening the previous file.
     if (descriptor == NULL) {
-        perror("[ERROR] Error while opening the file given as argument.");
+        perror("[ERROR] Error while opening the file given as argument.\n");
         return(-1);
     }
 
     // We extract the number of operations from the file (first line of the file).
     if (fscanf(descriptor, "%d", &num_operations) < 0) {
-        perror("[ERROR] Error looking for the number of operations.");
+        perror("[ERROR] Error looking for the number of operations.\n");
         return(-1);
     }
 
@@ -401,7 +402,7 @@ int main (int argc, const char * argv[] ) {
         }
     }
     if (fclose(descriptor) < 0) {
-        perror("[ERROR] Error closing the file descriptor.");
+        perror("[ERROR] Error closing the file descriptor.\n");
         return(-1);
     }
     
@@ -411,7 +412,7 @@ int main (int argc, const char * argv[] ) {
     // Note that num_lines - 1 is done since we do not consider the first line (number of operations).
     int real_lines = num_lines - 1;
     if (num_operations > real_lines) {
-        perror("[ERROR] There can not be fewer operations in the file than operations selected.");
+        perror("[ERROR] There can not be fewer operations in the file than operations selected.\n");
         return(-1);
     }
 
@@ -421,21 +422,21 @@ int main (int argc, const char * argv[] ) {
     // We initialize mutexes to deal with the shared buffer (queue).
     // During initialization, check all them to see if there is any error.
     if (pthread_mutex_init(&mutex, NULL) < 0) {
-        perror("[ERROR] Error in the initialization of the mutex.");
+        perror("[ERROR] Error in the initialization of the mutex.\n");
         return(-1);
     }
     if (pthread_mutex_init(&desc, NULL) < 0) {
-        perror("[ERROR] Error in the initialization of the mutex.");
+        perror("[ERROR] Error in the initialization of the mutex.\n");
         return(-1);
     }
     // Condition variable non_full.
     if (pthread_cond_init(&non_full, NULL) < 0) {
-        perror("[ERROR] Error in the initialization of the condition variable.");
+        perror("[ERROR] Error in the initialization of the condition variable.\n");
         return(-1);
     }
     // Condition variable non_empty.
     if (pthread_cond_init(&non_empty, NULL) < 0) {
-        perror("[ERROR] Error in the initialization of the condition variable.");
+        perror("[ERROR] Error in the initialization of the condition variable.\n");
         return(-1);
     }
 
@@ -474,7 +475,7 @@ int main (int argc, const char * argv[] ) {
         producer_args[j].initial_id = init;
 
         if (pthread_create(&producer_threads[j], NULL, (void*)producer, &producer_args[j]) < 0) {
-            perror("[ERROR] Error while creating a producer thread.");
+            perror("[ERROR] Error while creating a producer thread.\n");
             return(-1);
         }
 
@@ -489,7 +490,7 @@ int main (int argc, const char * argv[] ) {
     producer_args[num_producers - 1].initial_id = init;
 
     if (pthread_create(&producer_threads[num_producers - 1], NULL, (void*)producer, &producer_args[num_producers - 1]) < 0) {
-        perror("[ERROR] Error while creating the last producer thread.");
+        perror("[ERROR] Error while creating the last producer thread.\n");
         return(-1);
     }
 
@@ -506,7 +507,7 @@ int main (int argc, const char * argv[] ) {
         consumer_args[i].operations= consumer_operations;
 
         if (pthread_create(&consumer_threads[i], NULL, (void*)consumer, &consumer_args[i]) < 0) {
-            perror("[ERROR] Error while creating a consumer thread.");
+            perror("[ERROR] Error while creating a consumer thread.\n");
             return(-1);
         }
 
@@ -521,7 +522,7 @@ int main (int argc, const char * argv[] ) {
 
 	// Create the thread for the remaining consumer
     if (pthread_create(&consumer_threads[num_consumers - 1], NULL, (void*)consumer, &consumer_args[num_consumers - 1]) < 0) {
-        perror("[ERROR] Error while creating the last consumer thread.");
+        perror("[ERROR] Error while creating the last consumer thread.\n");
         return(-1);
     }
 
@@ -530,7 +531,7 @@ int main (int argc, const char * argv[] ) {
     // Loop to wait (using pthread_join) for all the consumer threads.
     for (int i = 0; i < num_consumers; i++) {
         if (pthread_join(consumer_threads[i], NULL) < 0) {
-            perror("[ERROR] Error while waiting for a consumer thread.");
+            perror("[ERROR] Error while waiting for a consumer thread.\n");
             return(-1);
         }
     }
@@ -538,7 +539,7 @@ int main (int argc, const char * argv[] ) {
     // Loop to wait (using pthread_join) for all the producer threads.
     for (int i = 0; i < num_producers; i++) {
         if (pthread_join(producer_threads[i], NULL) < 0) {
-            perror("[ERROR] Error while waiting for a producer thread.");
+            perror("[ERROR] Error while waiting for a producer thread.\n");
             return(-1);
         }
     }
@@ -551,25 +552,25 @@ int main (int argc, const char * argv[] ) {
 
     // We close the descriptors used (checking if there is any error).
     if (fclose(descProducer) < 0) {
-        perror("[ERROR] Error while closing the descriptor.");
+        perror("[ERROR] Error while closing the descriptor.\n");
         return(-1);
     }
     
     // We destroy all the mutexes and the conditional variables (checking if there is any error).
     if (pthread_mutex_destroy(&mutex) < 0) {
-        perror("[ERROR] Error while destroying the mutex.");
+        perror("[ERROR] Error while destroying the mutex.\n");
         return(-1);
     }
     if (pthread_mutex_destroy(&desc) < 0) {
-        perror("[ERROR] Error while destroying the mutex.");
+        perror("[ERROR] Error while destroying the mutex.\n");
         return(-1);
     }
     if (pthread_cond_destroy(&non_empty) < 0) {
-        perror("[ERROR] Error while destroying the conditional variable.");
+        perror("[ERROR] Error while destroying the conditional variable.\n");
         return(-1);
     }
     if (pthread_cond_destroy(&non_full) < 0) {
-        perror("[ERROR] Error while destroying the conditional variable.");
+        perror("[ERROR] Error while destroying the conditional variable.\n");
         return(-1);
     }
 

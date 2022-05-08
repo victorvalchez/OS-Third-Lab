@@ -1,4 +1,3 @@
-
 #include "queue.h"
 #include <fcntl.h>
 #include <pthread.h>
@@ -12,7 +11,7 @@
 #include <unistd.h>
 #include <math.h>
 
-/**
+/*
  * Entry point
  * @param argc
  * @param argv
@@ -24,6 +23,7 @@ int total_cost = 0;
 
 // Mutex to access shared buffer.
 pthread_mutex_t mutex;
+// Mutex to access the descriptor of the file introduced
 pthread_mutex_t desc;
 
 // Synchronization variable -> Can we add more elements?
@@ -272,7 +272,6 @@ void *consumer(void *arg) {
     	    exit(-1);
         }
 
-        // !!! ESTO CREO QUE NO SERÍA ASÍ PARA N CONSUMIDORES (creo que si porque en los productores es igual)
         // We wait until the queue is empty.
         while (queue_empty(buffer) == 1) {
             if (pthread_cond_wait(&non_empty, &mutex) < 0) {
