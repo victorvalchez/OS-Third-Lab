@@ -13,8 +13,8 @@
 
 
 // Declaration of functions for the producer and consumer that will be used.
-void *producer(void *arg);
-void *consumer(void *arg);
+void *producer(void *producer_arg);
+void *consumer(void *consumer_arg);
 
 // Integer variable to store the total cost asked as a result.
 int total_cost = 0;
@@ -309,10 +309,10 @@ int main (int argc, const char * argv[] ) {
 
 
 
-void *producer(void *arg) {
+void *producer(void *producer_arg) {
     // Gets the initial id and the number of operations for each producer.
 	// Get the corresponding id and operations in the structure.
-  	struct producer_params *p = arg;
+  	struct producer_params *p = producer_arg;
 
 	// Check for errors while locking the desc mutex.
   	if(pthread_mutex_lock(&desc) < 0) {
@@ -320,11 +320,8 @@ void *producer(void *arg) {
     	exit(-1);
   	}
     
-	// Get the descriptor of the initial line.
-  	descProducer = fopen(file, "r");
-
-    // Check for errors while opening the file.
-  	if(descProducer == NULL) {
+	// Get the descriptor of the initial line and check for errors while opening the file.
+  	if((descProducer = fopen(file, "r")) == NULL) {
     	perror("[ERROR] Error while opening the file.\n");
     	exit(-1);
   	}
@@ -342,7 +339,7 @@ void *producer(void *arg) {
   	}
     
   	// Store the current position to get it again later (everytime fgetc is executed it moves to the next posisition in the file).
-  	FILE *current = descProducer;
+  	FILE *current_line = descProducer;
 
     // Check for errors while unlocking the desc mutex.
   	if(pthread_mutex_unlock(&desc) < 0) {
@@ -361,7 +358,7 @@ void *producer(void *arg) {
     	}
         
 		// We restore the current line of the file (just in case it was lost).
-    	descProducer = current;
+    	descProducer = current_line;
         
 		// Store the corresponding values in the variables created before.
     	if(fscanf(descProducer, "%d %d %d", &id, &machine_type, &time_of_use) < 0) {
@@ -370,7 +367,7 @@ void *producer(void *arg) {
     	}
         
 		// Get again the current position (as it changes with fscanf).
-    	current = descProducer;
+    	current_line = descProducer;
 
         // Check for errors while unlocking the desc mutex.
     	if(pthread_mutex_unlock(&desc) < 0){
@@ -420,12 +417,12 @@ void *producer(void *arg) {
 
 
 
-void *consumer(void *arg) {
+void *consumer(void *consumer_arg) {
 	// Struct that contains the buffer data to be consumed.
 	struct element content_read;
 	
     // Struct for the operations
-    struct consumer_params *consumers = arg;
+    struct consumer_params *consumers = consumer_arg;
     
     // Loop until operations requested have been processed.
     for (int i = 0; i < consumers -> operations; i++) {
