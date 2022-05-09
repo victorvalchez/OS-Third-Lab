@@ -339,7 +339,7 @@ void *producer(void *producer_arg) {
   	}
     
   	// Store the current position to get it again later (everytime fgetc is executed it moves to the next posisition in the file).
-  	FILE *current_line = descProducer;
+  	FILE *current = descProducer;
 
     // Check for errors while unlocking the desc mutex.
   	if(pthread_mutex_unlock(&desc) < 0) {
@@ -358,7 +358,7 @@ void *producer(void *producer_arg) {
     	}
         
 		// We restore the current line of the file (just in case it was lost).
-    	descProducer = current_line;
+    	descProducer = current;
         
 		// Store the corresponding values in the variables created before.
     	if(fscanf(descProducer, "%d %d %d", &id, &machine_type, &time_of_use) < 0) {
@@ -367,7 +367,7 @@ void *producer(void *producer_arg) {
     	}
         
 		// Get again the current position (as it changes with fscanf).
-    	current_line = descProducer;
+    	current = descProducer;
 
         // Check for errors while unlocking the desc mutex.
     	if(pthread_mutex_unlock(&desc) < 0){
